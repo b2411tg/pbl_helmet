@@ -1,7 +1,7 @@
-# rknn_yolo_video_realtime_fast.py
 from rknnlite.api import RKNNLite
 import numpy as np
 import cv2, time, os
+import queue
 
 SIZE = 320
 RKNN_MODEL = 'yolo/best_rk3588_320.rknn'
@@ -12,8 +12,19 @@ IOU_THRES  = 0.5
 TOPK_PER_CLASS = 300
 CLASS_NAMES = ["stop_sign", "stop_road", "intersection", "backwards", "forwards", "school"]
 
+def put_latest(q: queue.Queue, item):
+    try:
+        q.put_nowait(item)
+    except queue.Full:
+        try:
+            q.get_nowait()
+        except queue.Empty:
+            pass
+        q.put_nowait(item)
+
 class DetectStopAndBackwards:
-    def __init__(self, out_queue):
+    def __init__(self, in_queue, out_queue):
+        self.in_queue = in_queue
         self.out_queue = out_queue
 
     def _xywh_to_xyxy(self, xywh):
@@ -96,14 +107,7 @@ class DetectStopAndBackwards:
         if not init_ok:
             assert rknn.init_runtime() == 0
 
-        # === 動画入力（FFmpeg 優先）===
-        #cap = cv2.VideoCapture(0)      # カメラ
-        cap = cv2.VideoCapture(VIDEO_IN, cv2.CAP_FFMPEG)
-        assert cap.isOpened(), f"動画を開けません: {VIDEO_IN}"
-
-        # 入力サイズ・スケール
-        ok, first = cap.read()
-        assert ok, "最初のフレーム取得に失敗"
+        first = self.in_queue.get(timeout=1)
         in_h, in_w = first.shape[:2]
         sx, sy = in_w / SIZE, in_h / SIZE
 
@@ -111,18 +115,12 @@ class DetectStopAndBackwards:
         inp_buf = np.empty((1, SIZE, SIZE, 3), dtype=np.uint8)
         tmp_resize = np.empty((SIZE, SIZE, 3), dtype=np.uint8)
 
-        # 先頭フレームを戻すために VideoCapture を再オープン（最も確実）
-        cap.release()
-        cap = cv2.VideoCapture(VIDEO_IN, cv2.CAP_FFMPEG)
-
         t0 = time.perf_counter()
         frames = 0
         font = cv2.FONT_HERSHEY_SIMPLEX
 
         while True:
-            ok, frame_bgr = cap.read()
-            if not ok:
-                break
+            frame_bgr = self.in_queue.get(timeout=1)
             frames += 1
 
             # 前処理（ゼロコピー風）
@@ -145,12 +143,4 @@ class DetectStopAndBackwards:
             fps_now = frames / dt if dt > 0 else 0.0
             cv2.putText(frame_bgr, f'FPS:{fps_now:.1f}', (8, 24), font, 0.7, (0,255,0), 2)
 
-            self.out_queue.put(frame_bgr)
-
-        cap.release()
-        rknn.release()
-        cv2.destroyAllWindows()
-
-if __name__ == '__main__':
-    detect = DetectStopAndBackwards()
-    detect.main()
+            put_latest(self.out_queue, frame_bgr)

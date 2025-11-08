@@ -5,6 +5,7 @@
 from rknnlite.api import RKNNLite
 import numpy as np
 import cv2
+import queue
 
 # ===== 設定 =====
 #RKNN_MODEL = "segmentation/seg_STDC_268_cityscapes_192x384_fp32.rknn"   # モデル名
@@ -26,8 +27,20 @@ PALETTE = np.array([
     [  0, 60,100],[  0, 80,100],[  0,  0,230],[119, 11, 32]
 ], dtype=np.uint8)
 
+def put_latest(q: queue.Queue, item):
+    try:
+        q.put_nowait(item)
+    except queue.Full:
+        try:
+            q.get_nowait()
+        except queue.Empty:
+            pass
+        q.put_nowait(item)
+
+
 class DetectSidewalk:
-    def __init__(self, out_queue):
+    def __init__(self, in_queue, out_queue):
+        self.in_queue = in_queue
         self.out_queue = out_queue
 
     def _nc1hwc2_to_nchw(self, x):
@@ -59,15 +72,13 @@ class DetectSidewalk:
         assert rk.init_runtime() == 0, "init_runtime failed"
     
         # ===== 入力（動画 or カメラ） =====
-        #cap = cv2.VideoCapture(0)  # カメラ
-        cap = cv2.VideoCapture(VIDEO)  # 動画ファイル
+        #cap = cv2.VideoCapture(11)  # カメラ
+        #cap = cv2.VideoCapture(VIDEO)  # 動画ファイル
     
         prev_probs = None  # EMA用の前フレーム確率
     
         while True:
-            ret, frame_bgr = cap.read()
-            if not ret:
-                break
+            frame_bgr = self.in_queue.get(timeout=1)
             
             # ----- 前処理（NHWC / RGB） -----
             rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
@@ -119,11 +130,4 @@ class DetectSidewalk:
             else:
                 overlay = cv2.addWeighted(frame_bgr, 1.0 - ALPHA, color, ALPHA, 0.0)
     
-            self.out_queue.put(overlay)
-
-        cap.release()
-        cv2.destroyAllWindows()
-
-if __name__ == '__main__':
-    detect = DetectSidewalk()
-    detect.main()
+            put_latest(self.out_queue, overlay)
