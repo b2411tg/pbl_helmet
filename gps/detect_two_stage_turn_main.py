@@ -16,7 +16,7 @@ DETECT_STOP_RADIUS = 15          # 違反検出位置から停止するを半径
 
 
 class Detect2ndTurn:
-    def __init__(self):
+    def __init__(self, shared):
         self.matcher = OfflineSequentialMatcher(search_m=8, switch_penalty_m=30, w_dist=1.0, w_head=0.4, w_prog=0.6)
         self.prev = None
         self.prev_match_data = deque(maxlen=PREV_SAVE_SIZE)     # マッチングデータ過去データ配列
@@ -24,6 +24,7 @@ class Detect2ndTurn:
         self.from_detect_pos = 0
         self.detect_pos = 0
         self.detect_on = True
+        self.shared = shared
 
     def _bearing_deg(self, lat1, lon1, lat2, lon2):
         """(lat1,lon1)->(lat2,lon2) の方位角[deg]"""
@@ -66,6 +67,7 @@ class Detect2ndTurn:
         #TODO GPSから緯度経度取得
         df = pd.read_csv(PATH)  # 列: UTC, latitude, longitude
         for idx, r in df.iterrows():
+            time.sleep(0.1)            
         #TODO ここまで
 
             # マップマッチングデータ取得（緯度、経度、走行距離/s、走行方角
@@ -86,10 +88,16 @@ class Detect2ndTurn:
             # 近くの交差点緯度経度取得
             near_lat, near_lon, near_intersection_distance = nearest_intersection_with_distance(match_lat, match_lon)
 
-            # 交差点まで３０m以内か
+            # 交差点まで30m以内か
             if near_intersection_distance > 30:
                 print(f'{utc},{match_lat:.6f},{match_lon:.6f},{angle_deg},{move_distance_m}')
+                self.shared.detect_intersection_30m.clear()
                 continue
+
+            # yoloﾀｽｸに交差点30m圏内である事を通知
+            self.shared.detect_intersection_30m.set()
+            if self.shared.detect_stop.is_set():
+                pass
 
             # マップマッチングデータにおける密集度算出（指定の過去データと距離を算出）
             max_distance = 0

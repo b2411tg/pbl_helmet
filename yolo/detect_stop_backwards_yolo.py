@@ -23,10 +23,12 @@ def put_latest(q: queue.Queue, item):
         q.put_nowait(item)
 
 class DetectStopAndBackwards:
-    def __init__(self, in_queue, out_queue):
+    def __init__(self, shared, in_queue, out_queue):
+        self.shared = shared
         self.in_queue = in_queue
         self.out_queue = out_queue
-
+        self.detect_stop_flag = False
+        
     def _xywh_to_xyxy(self, xywh):
         cx, cy, w, h = xywh.T
         return np.stack([cx - w/2, cy - h/2, cx + w/2, cy + h/2], axis=1)
@@ -120,6 +122,8 @@ class DetectStopAndBackwards:
         font = cv2.FONT_HERSHEY_SIMPLEX
 
         while True:
+            if self.in_queue.empty():
+                continue         
             frame_bgr = self.in_queue.get(timeout=1)
             frames += 1
 
@@ -138,6 +142,12 @@ class DetectStopAndBackwards:
                 name = CLASS_NAMES[ci] if 0 <= ci < len(CLASS_NAMES) else str(ci)
                 cv2.putText(frame_bgr, f'{name}:{sc:.2f}', (X1, max(12, Y1-4)), font, 0.5, (0,255,0), 1, cv2.LINE_AA)
 
+                # 交差点30m以内検知で一時停止を検出した時にﾌﾗｸﾞをｾｯﾄしてGPSﾀｽｸに通知する
+                if not self.shared.detect_stop.is_set() and self.shared.detect_intersection_30m.is_set() and (name=="stop_sign" or name=="stop_road"):
+                    self.shared.detect_stop.set()
+                elif not self.shared.detect_intersection_30m.is_set():
+                    self.shared.detect_stop.clear()
+                
             # FPS 表示
             dt = time.perf_counter() - t0
             fps_now = frames / dt if dt > 0 else 0.0

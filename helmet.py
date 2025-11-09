@@ -4,7 +4,13 @@ from yolo.detect_stop_backwards_yolo import DetectStopAndBackwards
 from segmentation.detect_sidewalk_segmentation import DetectSidewalk
 import cv2
 import queue
+from threading import Event
 
+class Shared:
+    def __init__(self):
+        self.detect_stop = Event()
+        self.detect_intersection_30m = Event()
+        
 def put_latest(q: queue.Queue, item):
     try:
         q.put_nowait(item)
@@ -39,6 +45,8 @@ def main():
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
+    shared = Shared()
+
     # ｶﾒﾗのﾌﾚｰﾑﾃﾞｰﾀ保存ｷｭｰと推論結果後のﾌﾚｰﾑ を保存するｷｭｰ
     frame_yolo_in = queue.Queue(maxsize=2)
     frame_seg_in = queue.Queue(maxsize=2)
@@ -47,12 +55,13 @@ if __name__ == '__main__':
 
     # ﾒｲﾝ側でｶﾒﾗをｵｰﾌﾟﾝしてﾌﾚｰﾑを取得するﾀｽｸ 設定
     cap = cv2.VideoCapture(11)
+    net, frame = cap.read()
     thread_cap = threading.Thread(target=capture_loop, args=(cap, [frame_yolo_out, frame_seg_out]), daemon=True)
     thread_cap.start()
 
     # 各ﾀｽｸの設定
-    detect_2ndturn = Detect2ndTurn()
-    detect_stp_back = DetectStopAndBackwards(in_queue=frame_yolo_out, out_queue=frame_yolo_in)
+    detect_2ndturn = Detect2ndTurn(shared)
+    detect_stp_back = DetectStopAndBackwards(shared, in_queue=frame_yolo_out, out_queue=frame_yolo_in)
     detect_sidewalk = DetectSidewalk(in_queue=frame_seg_out, out_queue=frame_seg_in)
     thread_2ndturn = threading.Thread(target=detect_2ndturn.main, daemon=True)
     thread_stp_back = threading.Thread(target=detect_stp_back.main, daemon=True)
