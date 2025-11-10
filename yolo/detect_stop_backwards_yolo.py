@@ -11,6 +11,7 @@ CONF_THRES = 0.8
 IOU_THRES  = 0.5
 TOPK_PER_CLASS = 300
 CLASS_NAMES = ["stop_sign", "stop_road", "intersection", "backwards", "forwards", "school"]
+DETECT_COMP_CNT = 5
 
 def put_latest(q: queue.Queue, item):
     try:
@@ -28,7 +29,8 @@ class DetectStopAndBackwards:
         self.in_queue = in_queue
         self.out_queue = out_queue
         self.detect_stop_flag = False
-        
+        self.detect_stop_cnt = 0
+
     def _xywh_to_xyxy(self, xywh):
         cx, cy, w, h = xywh.T
         return np.stack([cx - w/2, cy - h/2, cx + w/2, cy + h/2], axis=1)
@@ -135,6 +137,7 @@ class DetectStopAndBackwards:
             outs = rknn.inference(inputs=[inp_buf], data_format="nhwc")
 
             # 後処理
+            name = ""
             for box, sc, ci in self._postprocess(outs, CONF_THRES, IOU_THRES, SIZE, TOPK_PER_CLASS):
                 x1,y1,x2,y2 = box
                 X1, Y1, X2, Y2 = int(x1*sx), int(y1*sy), int(x2*sx), int(y2*sy)
@@ -142,11 +145,15 @@ class DetectStopAndBackwards:
                 name = CLASS_NAMES[ci] if 0 <= ci < len(CLASS_NAMES) else str(ci)
                 cv2.putText(frame_bgr, f'{name}:{sc:.2f}', (X1, max(12, Y1-4)), font, 0.5, (0,255,0), 1, cv2.LINE_AA)
 
-                # 交差点30m以内検知で一時停止を検出した時にﾌﾗｸﾞをｾｯﾄしてGPSﾀｽｸに通知する
-                if not self.shared.detect_stop.is_set() and self.shared.detect_intersection_30m.is_set() and (name=="stop_sign" or name=="stop_road"):
+            # 交差点30m以内検知で一時停止を検出した時にﾌﾗｸﾞをｾｯﾄしてGPSﾀｽｸに通知する
+            if self.shared.detect_intersection_30m.is_set() and (name=="stop_sign" or name=="stop_road"):
+                self.detect_stop_cnt += 1
+                if self.detect_stop_cnt >= DETECT_COMP_CNT and not self.shared.detect_stop.is_set():
+                    self.detect_stop_cnt = DETECT_COMP_CNT
                     self.shared.detect_stop.set()
-                elif not self.shared.detect_intersection_30m.is_set():
-                    self.shared.detect_stop.clear()
+            if not self.shared.detect_intersection_30m.is_set() and self.shared.detect_stop.is_set():
+                self.detect_stop_cnt = 0
+                self.shared.detect_stop.clear()
                 
             # FPS 表示
             dt = time.perf_counter() - t0

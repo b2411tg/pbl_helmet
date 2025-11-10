@@ -25,6 +25,7 @@ def capture_loop(cap, outputs):
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     while True:
         ret, frame = cap.read()
+#        frame = cv2.rotate(frame, cv2.ROTATE_180)
         if not ret:
             break
         # 各タスク入力キューへ複製を配信

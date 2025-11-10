@@ -96,8 +96,6 @@ class Detect2ndTurn:
 
             # yoloﾀｽｸに交差点30m圏内である事を通知
             self.shared.detect_intersection_30m.set()
-            if self.shared.detect_stop.is_set():
-                pass
 
             # マップマッチングデータにおける密集度算出（指定の過去データと距離を算出）
             max_distance = 0
@@ -117,8 +115,23 @@ class Detect2ndTurn:
                 print(f'{utc},{match_lat:.6f},{match_lon:.6f},{angle_deg},{move_distance_m},{prev_density_distance_m}')
                 continue
             if move_distance_m < DETECT_MOVE_DISTANCE:              # 自転車は走行しているか
-                print(f'{utc},{match_lat:.6f},{match_lon:.6f},{angle_deg},{move_distance_m},{prev_density_distance_m}')
-                continue
+                # 走行停止の場合
+                if self.shared.detect_stop.is_set():                # 一時停止監視中の場合
+                    _, intersection_angle_deg = distance_and_bearing_east0( # 交差点の方角取得
+                        self.prev_former_data[PREV_SAVE_SIZE-1][1],
+                        self.prev_former_data[PREV_SAVE_SIZE-1][2],
+                                near_lat, near_lon)
+                    d = (intersection_angle_deg - angle_deg) % 360
+                    if not (90 < d < 270):                          # 走行方角に対し交差点は前方か
+                        print(f'{utc},{match_lat:.6f},{match_lon:.6f},{angle_deg},{move_distance_m},{prev_density_distance_m},"detect_stop_OK"')
+                        continue
+                    else:                                           # 走行方角に対し交差点は後方
+                        print(f'{utc},{match_lat:.6f},{match_lon:.6f},{angle_deg},{move_distance_m},{prev_density_distance_m},"detect_stop_NG"')
+                        continue
+                else:   # 一時停止監視中でない場合は何もしない
+                    print(f'{utc},{match_lat:.6f},{match_lon:.6f},{angle_deg},{move_distance_m},{prev_density_distance_m}')
+                    continue
+            # 走行していた場合交差点の方角取得
             _, intersection_angle_deg = distance_and_bearing_east0( # 交差点の方角取得
                 self.prev_former_data[PREV_SAVE_SIZE-1][1],
                 self.prev_former_data[PREV_SAVE_SIZE-1][2],
