@@ -22,7 +22,8 @@ def put_latest(q: queue.Queue, item):
         q.put_nowait(item)
 
 def capture_loop(cap, outputs):
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
     while True:
         ret, frame = cap.read()
 #        frame = cv2.rotate(frame, cv2.ROTATE_180)
@@ -56,7 +57,6 @@ if __name__ == '__main__':
 
     # ﾒｲﾝ側でｶﾒﾗをｵｰﾌﾟﾝしてﾌﾚｰﾑを取得するﾀｽｸ 設定
     cap = cv2.VideoCapture(11)
-    net, frame = cap.read()
     thread_cap = threading.Thread(target=capture_loop, args=(cap, [frame_yolo_out, frame_seg_out]), daemon=True)
     thread_cap.start()
 
