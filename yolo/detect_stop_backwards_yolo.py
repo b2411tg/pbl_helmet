@@ -124,6 +124,8 @@ class DetectStopAndBackwards:
         font = cv2.FONT_HERSHEY_SIMPLEX
 
         while True:
+            if self.in_queue.empty():
+                continue         
             frame_bgr = self.in_queue.get(timeout=1)
             frames += 1
 
