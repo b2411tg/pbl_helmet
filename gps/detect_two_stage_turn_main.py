@@ -17,7 +17,7 @@ DETECT_STOP_RADIUS = 15          # 違反検出位置から停止するを半径
 
 class Detect2ndTurn:
     def __init__(self, shared):
-        self.matcher = OfflineSequentialMatcher(search_m=8, switch_penalty_m=30, w_dist=1.0, w_head=0.4, w_prog=0.6)
+        self.matcher = OfflineSequentialMatcher(search_m=8, switch_penalty_m=20, w_dist=1.0, w_head=0.4, w_prog=0.6)
         self.prev = None
         self.prev_match_data = deque(maxlen=PREV_SAVE_SIZE)     # マッチングデータ過去データ配列
         self.prev_former_data = deque(maxlen=PREV_SAVE_SIZE)    # 元データ過去データ配列
@@ -64,7 +64,11 @@ class Detect2ndTurn:
                 return utc, st.lat, st.lon, st.heading
             
     def main(self):
-        near_intersection_distance = 0
+        match_intersection_distance = 0
+        nomatch_intersection_distance = 0
+        match_lat = 0
+        match_lon = 0
+        leave_cnt = 0
 
         #TODO GPSから緯度経度取得
         df = pd.read_csv(PATH)  # 列: UTC, latitude, longitude
@@ -75,42 +79,69 @@ class Detect2ndTurn:
             latitude = r["latitude"]
             longitude = r["longitude"]
 
+            if utc==123735.0:
+                pass
+
+            ''' これよりマッチング緯度経度取得、移動距離取得、走行方向取得、交差点緯度経度距離処理 '''
+
             # 現在の緯度経度と前の緯度経度から移動距離、方角を取得
             former_move_distance, angle_deg, heading = self._get_heading_distance(latitude, longitude)
 
             # マップマッチングデータ取得（緯度、経度、走行方角、走行距離m/s
             try:
+                prev_match_lat = match_lat
+                prev_match_lon = match_lon
                 utc, match_lat, match_lon, match_heading= self._location_matching(utc, latitude, longitude, heading)
+                # 交差点近くはﾏｯﾁﾝｸﾞできない為、前回の値にする
+                if match_lat == -1 and match_lon == -1:
+                    match_lat = prev_match_lat
+                    match_lon = prev_match_lon
                 # 近くの交差点緯度経度取得
-                self.prev_distance = near_intersection_distance
-                near_lat, near_lon, near_intersection_distance = nearest_intersection_with_distance(match_lat, match_lon)
-                self.prev_match_data.append((utc, match_lat, match_lon, match_heading, near_intersection_distance))
+                self.match_prev_distance = match_intersection_distance
+                self.nomatch_prev_distance = nomatch_intersection_distance
+                near_lat, near_lon, match_intersection_distance = nearest_intersection_with_distance(match_lat, match_lon)
+                _, _, nomatch_intersection_distance = nearest_intersection_with_distance(latitude, longitude)
+                self.prev_match_data.append((utc, match_lat, match_lon, match_heading, match_intersection_distance))
                 self.prev_former_data.append((utc, latitude, longitude, angle_deg, former_move_distance))
             except:
-                self.prev_match_data.append((utc, match_lat, match_lon, match_heading, near_intersection_distance))
+                self.prev_match_data.append((utc, match_lat, match_lon, match_heading, match_intersection_distance))
                 self.prev_former_data.append((utc, latitude, longitude, angle_deg, former_move_distance))
-                print(f'{utc},{match_lat:.6f},{match_lon:.6f},{angle_deg},{former_move_distance},{near_intersection_distance}')
+                print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}')
                 continue
+
+            ''' これより二段階右折、一時停止違反検出アルゴリズム '''
 
             # 前回検出地点から指定の半径は検出しない（重複防止）
             if self.detect_on == False:
                 self.from_detect_pos, _ = distance_and_bearing_east0(self.detect_pos[0], self.detect_pos[1], r["latitude"], r["longitude"])
                 if self.from_detect_pos < DETECT_STOP_RADIUS:
-                    print(f'{utc},{match_lat:.6f},{match_lon:.6f},{angle_deg},{former_move_distance},{near_intersection_distance}')
+                    print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}')
                     continue
             self.detect_on = True
 
             # 交差点まで30m以内か
-            if near_intersection_distance > 30:
-                print(f'{utc},{match_lat:.6f},{match_lon:.6f},{angle_deg},{former_move_distance},{near_intersection_distance}')
+            if match_intersection_distance > 30:
+                print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}')
                 self.shared.detect_intersection_30m.clear()
+                leave_cnt = 0
                 continue
             
             # 交差点に近づいていってるか
-            if not self.shared.detect_intersection_30m.is_set() and self.prev_distance < near_intersection_distance:
-                print(f'{utc},{match_lat:.6f},{match_lon:.6f},{angle_deg},{former_move_distance},{near_intersection_distance}')
+            if not self.shared.detect_intersection_30m.is_set() and self.match_prev_distance < match_intersection_distance:
+                print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}')
                 self.shared.detect_intersection_30m.clear()
+                leave_cnt = 0
                 continue
+            # 交差点及び一時停止監視中に交差点が離れていった場合は一時停止違反と判定
+            elif self.shared.detect_intersection_30m.is_set() and self.shared.detect_stop.is_set() and self.nomatch_prev_distance < nomatch_intersection_distance:
+                # 離れていく軌跡連続5回でNGと判断
+                leave_cnt += 1
+                if leave_cnt >= 5:
+                    print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}, "detect_stop_NG"')
+                    self.shared.detect_intersection_30m.clear()
+                    self.detect_pos = [latitude, longitude]
+                    self.detect_on = False   # 指定の半径は検出を停止する（重複防止）
+                    continue
 
             # 交差点監視ﾌﾗｸﾞｾｯﾄ
             self.shared.detect_intersection_30m.set()
@@ -120,27 +151,29 @@ class Detect2ndTurn:
             column_distance = [row[4] for row in subset]
             prev_density_distance_m = max(column_distance) - min(column_distance)
 
-            # 判定　ﾏｯﾁﾝｸﾞﾃﾞｰﾀ密集度＋移動距離/m＋交差点の方角＋走行方角
-            if prev_density_distance_m > DENSITY_DETECT_DISTANCE:   # ﾏｯﾁﾝｸﾞﾃﾞｰﾀは指定の距離の範囲内に密集しているか
-                print(f'{utc},{match_lat:.6f},{match_lon:.6f},{angle_deg},{former_move_distance},{near_intersection_distance},{prev_density_distance_m}')
+            ''' 判定  ﾏｯﾁﾝｸﾞﾃﾞｰﾀ密集度＋移動距離/m＋交差点の方角＋走行方角 '''
+
+            # ﾏｯﾁﾝｸﾞﾃﾞｰﾀは指定の距離の範囲内に密集しているか
+            if prev_density_distance_m > DENSITY_DETECT_DISTANCE:
+                print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}')
                 continue
-            if former_move_distance < DETECT_MOVE_DISTANCE:              # 自転車は走行しているか
-                # 走行停止の場合
-                if self.shared.detect_stop.is_set():                # 一時停止監視中の場合
-                    _, intersection_angle_deg = distance_and_bearing_east0( # 交差点の方角取得
-                        self.prev_former_data[PREV_SAVE_SIZE-1][1],
-                        self.prev_former_data[PREV_SAVE_SIZE-1][2],
-                                near_lat, near_lon)
-                    d = (intersection_angle_deg - angle_deg) % 360
-                    if not (90 < d < 270):                          # 走行方角に対し交差点は前方か
-                        print(f'{utc},{match_lat:.6f},{match_lon:.6f},{angle_deg},{former_move_distance},{near_intersection_distance},{prev_density_distance_m},"detect_stop_OK"')
-                        continue
-                    else:                                           # 走行方角に対し交差点は後方
-                        print(f'{utc},{match_lat:.6f},{match_lon:.6f},{angle_deg},{former_move_distance},{near_intersection_distance},{prev_density_distance_m},"detect_stop_NG"')
-                        continue
-                else:   # 一時停止監視中でない場合は何もしない
-                    print(f'{utc},{match_lat:.6f},{match_lon:.6f},{angle_deg},{former_move_distance},{near_intersection_distance},{prev_density_distance_m}')
+
+            # 自転車は右折走行中かどうか確認
+            if former_move_distance < DETECT_MOVE_DISTANCE:
+                # 右折走行中を確認できなかった場合、一時停止監視中か
+                if not self.shared.detect_stop.is_set():                
+                    print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}')
                     continue
+                # 一時停止監視中の場合マッチング前データは停止状態か確認 1m/s
+                if former_move_distance > 1:                 
+                    print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}')
+                    continue
+                # 一時停止監視中、停止したと確認できた為、OKと判定
+                print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}, "detect_stop_OK"')
+                self.detect_pos = [latitude, longitude]
+                self.detect_on = False   # 指定の半径は検出を停止する（重複防止）
+                continue
+
             # 走行していた場合交差点の方角取得
             _, intersection_angle_deg = distance_and_bearing_east0( # 交差点の方角取得
                 self.prev_former_data[PREV_SAVE_SIZE-1][1],
@@ -148,10 +181,11 @@ class Detect2ndTurn:
                          near_lat, near_lon)
             deg = (intersection_angle_deg - angle_deg) % 360
             if 180 < deg < 360:                                       # 走行方角に対し交差点は右側か左側か
-                print(f'{utc},{match_lat:.6f},{match_lon:.6f},{angle_deg},{former_move_distance},{near_intersection_distance},{prev_density_distance_m}')
+                print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}')
                 continue
-            # 違反とする
-            print(f'{utc},{match_lat:.6f},{match_lon:.6f},{angle_deg},{former_move_distance},{near_intersection_distance},{prev_density_distance_m},"detect_2nd_turn"')
+
+            # ここまできたら二段階右折違反条件成立
+            print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}, "detect_2nd_turn"')
             self.detect_pos = [latitude, longitude]
             self.detect_on = False   # 指定の半径は検出を停止する（重複防止）
 
