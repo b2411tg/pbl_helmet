@@ -6,7 +6,9 @@ from collections import deque
 import math
 import time
 
-PATH = "./gps/gps_log_neo_f10n_20251021_213516.csv"
+#PATH = "./gps/gps_log_neo_f10n_20251021_213516.csv"
+#PATH = "./gps/gps_log_20251116_134409.csv"
+PATH = "./gps/gps_log_20251116_134409_1.csv"
 PREV_DENSITY_DATA = 7           # 密集を検出するデータの範囲
 DENSITY_DETECT_DISTANCE = 1     # 密集を検出する範囲(m)
 PREV_SAVE_SIZE = 10             # 検出に使用する為のデータ保存数
@@ -38,7 +40,7 @@ class Detect2ndTurn:
                 self.prev_former_data[PREV_SAVE_SIZE-DIRECTION_PREV_DIFF][2],
                 lat, lon) 
             # 現在の走行方向(地理座標系の方位角であり北0度で時計回りである事に注意)
-            heading = self._bearing_deg(self.prev_former_data[PREV_SAVE_SIZE-1][1], self.prev_former_data[PREV_SAVE_SIZE-1][2], lat, lon)
+            heading = self._bearing_deg(self.prev_former_data[PREV_SAVE_SIZE-5][1], self.prev_former_data[PREV_SAVE_SIZE-1][2], lat, lon)
         return former_move_distance, past_angle, heading
 
     def _bearing_deg(self, lat1, lon1, lat2, lon2):
@@ -69,6 +71,8 @@ class Detect2ndTurn:
         match_lat = 0
         match_lon = 0
         leave_cnt = 0
+        near_lat = 0
+        near_lon = 0
 
         #TODO GPSから緯度経度取得
         df = pd.read_csv(PATH)  # 列: UTC, latitude, longitude
@@ -79,7 +83,11 @@ class Detect2ndTurn:
             latitude = r["latitude"]
             longitude = r["longitude"]
 
-            if utc==123735.0:
+            if utc==16044475.0:
+                pass
+            if utc==16044583.0:
+                pass
+            if utc==16044660.0:
                 pass
 
             ''' これよりマッチング緯度経度取得、移動距離取得、走行方向取得、交差点緯度経度距離処理 '''
@@ -99,6 +107,8 @@ class Detect2ndTurn:
                 # 近くの交差点緯度経度取得
                 self.match_prev_distance = match_intersection_distance
                 self.nomatch_prev_distance = nomatch_intersection_distance
+                prev_near_lat = near_lat
+                prev_near_lon = near_lon
                 near_lat, near_lon, match_intersection_distance = nearest_intersection_with_distance(match_lat, match_lon)
                 _, _, nomatch_intersection_distance = nearest_intersection_with_distance(latitude, longitude)
                 self.prev_match_data.append((utc, match_lat, match_lon, match_heading, match_intersection_distance))
@@ -106,6 +116,11 @@ class Detect2ndTurn:
             except:
                 self.prev_match_data.append((utc, match_lat, match_lon, match_heading, match_intersection_distance))
                 self.prev_former_data.append((utc, latitude, longitude, angle_deg, former_move_distance))
+                print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}')
+                continue
+
+            # データが指定数保存されるまでは検知に移行しない
+            if len(self.prev_match_data) < PREV_SAVE_SIZE:
                 print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}')
                 continue
 
@@ -117,7 +132,13 @@ class Detect2ndTurn:
                 if self.from_detect_pos < DETECT_STOP_RADIUS:
                     print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}')
                     continue
-            self.detect_on = True
+                else:
+                    self.shared.detect_intersection_30m.clear()
+                    self.detect_on = True
+
+            # 近くの交差点検出位置が変化したら検出リセット
+            if prev_near_lat != near_lat and prev_near_lon != near_lon:
+                self.shared.detect_intersection_30m.clear()
 
             # 交差点まで30m以内か
             if match_intersection_distance > 30:
@@ -142,9 +163,13 @@ class Detect2ndTurn:
                     self.detect_pos = [latitude, longitude]
                     self.detect_on = False   # 指定の半径は検出を停止する（重複防止）
                     continue
-
-            # 交差点監視ﾌﾗｸﾞｾｯﾄ
-            self.shared.detect_intersection_30m.set()
+            else:
+                leave_cnt = 0
+            
+            # 交差点監視ﾌﾗｸﾞ及び走行方向を保存
+            if not self.shared.detect_intersection_30m.is_set():
+                self.shared.detect_intersection_30m.set()
+                save_running_direction = angle_deg
 
             # マップマッチングデータにおける密集度算出（指定の過去データと距離を算出）
             subset = list(self.prev_match_data)[PREV_SAVE_SIZE-PREV_DENSITY_DATA: PREV_SAVE_SIZE]
@@ -181,6 +206,12 @@ class Detect2ndTurn:
                          near_lat, near_lon)
             deg = (intersection_angle_deg - angle_deg) % 360
             if 180 < deg < 360:                                       # 走行方角に対し交差点は右側か左側か
+                print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}')
+                continue
+
+            # 二段階右折は右に40度以上の変化とする
+            deg = (save_running_direction - angle_deg) % 360
+            if not (40 < deg < 180):
                 print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}')
                 continue
 
