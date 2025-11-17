@@ -1,14 +1,14 @@
-from gps.gnss_turn_detect.nearest_intersection import nearest_intersection, nearest_intersection_with_distance
-from gps.gnss_turn_detect.distance_and_bearing import distance_and_bearing_east0
-from gps.gnss_turn_detect.online_matcher import OfflineSequentialMatcher
+from detect_stop_two.gnss_turn_detect.nearest_intersection import nearest_intersection, nearest_intersection_with_distance
+from detect_stop_two.gnss_turn_detect.distance_and_bearing import distance_and_bearing_east0
+from detect_stop_two.gnss_turn_detect.online_matcher import OfflineSequentialMatcher
 import pandas as pd
 from collections import deque
 import math
 import time
 
-#PATH = "./gps/gps_log_neo_f10n_20251021_213516.csv"
-#PATH = "./gps/gps_log_20251116_134409.csv"
-PATH = "./gps/gps_log_20251116_134409_1.csv"
+#PATH = "./detect_stop_two/gps_log_neo_f10n_20251021_213516.csv"
+#PATH = "./detect_stop_two/gps_log_20251116_134409.csv"
+PATH = "./detect_stop_two/gps_log_20251116_134409_1.csv"
 PREV_DENSITY_DATA = 7           # 密集を検出するデータの範囲
 DENSITY_DETECT_DISTANCE = 1     # 密集を検出する範囲(m)
 PREV_SAVE_SIZE = 10             # 検出に使用する為のデータ保存数

@@ -1,1 +1,7 @@
 yolo/*.mp4
+__pycache__/*.pyc
+detect_stop_two/__pycache__/*.pyc
+detect_stop_two/gnss_turn_detect/__pycache__/*.pyc
+yolo/__pycache__
+segmentation/__pycache__
+*.csv

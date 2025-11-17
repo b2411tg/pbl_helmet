@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import os
-INTERSECTIONS_PATH = Path("./gps/map/intersection_nodes.geojson")
+INTERSECTIONS_PATH = Path("./detect_stop_two/map/intersection_nodes.geojson")
 
 def _load_intersections(path: Path = INTERSECTIONS_PATH):
     if not path.exists():

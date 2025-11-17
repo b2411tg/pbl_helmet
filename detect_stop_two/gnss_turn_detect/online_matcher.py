@@ -7,7 +7,7 @@ from typing import Optional, Tuple, List
 from shapely.geometry import shape, LineString, MultiLineString, Point
 from shapely.strtree import STRtree
 
-ROAD_PATH = "./gps/map/roads.geojson"
+ROAD_PATH = "./detect_stop_two/map/roads.geojson"
 
 def bearing_deg(p1: Tuple[float,float], p2: Tuple[float,float]) -> float:
     lat1, lon1 = map(math.radians, p1)

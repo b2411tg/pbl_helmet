@@ -1,6 +1,6 @@
 import threading
-from gps.detect_two_stage_turn_main import Detect2ndTurn
-from yolo.detect_stop_backwards_yolo import DetectStopAndBackwards
+from detect_stop_two.stop_and_right_turn_detect import Detect2ndTurn
+from yolo.yolo_object_detect import DetectStopAndBackwards
 from segmentation.detect_sidewalk_segmentation import DetectSidewalk
 import cv2
 import queue

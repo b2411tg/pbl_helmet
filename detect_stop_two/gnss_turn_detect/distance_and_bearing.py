@@ -4,7 +4,7 @@
 出力：距離と方角
 '''
 import math
-from gps.gnss_turn_detect.nearest_intersection import nearest_intersection, nearest_intersection_with_distance
+from detect_stop_two.gnss_turn_detect.nearest_intersection import nearest_intersection, nearest_intersection_with_distance
 
 def distance_and_bearing_east0(lat1, lon1, lat2, lon2, radius=6371000.0):
     """
