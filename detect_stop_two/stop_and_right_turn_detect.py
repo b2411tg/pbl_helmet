@@ -5,6 +5,8 @@ import pandas as pd
 from collections import deque
 import math
 import time
+import sounddevice as sd
+import soundfile as sf
 
 #PATH = "./detect_stop_two/gps_log_neo_f10n_20251021_213516.csv"
 #PATH = "./detect_stop_two/gps_log_20251116_134409.csv"
@@ -27,6 +29,9 @@ class Detect2ndTurn:
         self.detect_pos = 0
         self.detect_on = True
         self.shared = shared
+        self.wav_data_stop_ok, self.wav_samplerate_stop_ok = sf.read("sound/detect_stop_ok.wav", dtype="float32")
+        self.wav_data_stop_ng, self.wav_samplerate_stop_ng = sf.read("sound/detect_stop_ng.wav", dtype="float32")
+        self.wav_data_turn_ng, self.wav_samplerate_turn_ng = sf.read("sound/detect_two_turn_ng.wav", dtype="float32")
 
     def _get_heading_distance(self, lat, lon):
         if len(self.prev_former_data) < (PREV_SAVE_SIZE):
@@ -159,6 +164,7 @@ class Detect2ndTurn:
                 leave_cnt += 1
                 if leave_cnt >= 5:
                     print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}, "detect_stop_NG"')
+                    sd.play(self.wav_data_stop_ng, self.wav_samplerate_stop_ng, blocking=False)
                     self.shared.detect_intersection_30m.clear()
                     self.detect_pos = [latitude, longitude]
                     self.detect_on = False   # 指定の半径は検出を停止する（重複防止）
@@ -195,6 +201,7 @@ class Detect2ndTurn:
                     continue
                 # 一時停止監視中、停止したと確認できた為、OKと判定
                 print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}, "detect_stop_OK"')
+                sd.play(self.wav_data_stop_ok, self.wav_samplerate_stop_ok, blocking=False)
                 self.detect_pos = [latitude, longitude]
                 self.detect_on = False   # 指定の半径は検出を停止する（重複防止）
                 continue
@@ -217,6 +224,7 @@ class Detect2ndTurn:
 
             # ここまできたら二段階右折違反条件成立
             print(f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}, "detect_2nd_turn"')
+            sd.play(self.wav_data_turn_ng, self.wav_samplerate_turn_ng, blocking=False)
             self.detect_pos = [latitude, longitude]
             self.detect_on = False   # 指定の半径は検出を停止する（重複防止）
 

@@ -2,6 +2,8 @@ from rknnlite.api import RKNNLite
 import numpy as np
 import cv2, time, os
 import queue
+import sounddevice as sd
+import soundfile as sf
 
 SIZE = 320
 RKNN_MODEL = 'yolo/best_rk3588_320.rknn'
@@ -23,14 +25,44 @@ def put_latest(q: queue.Queue, item):
             pass
         q.put_nowait(item)
 
-class DetectStopAndBackwards:
+class DetectYoloObject:
     def __init__(self, shared, in_queue, out_queue):
         self.shared = shared
         self.in_queue = in_queue
         self.out_queue = out_queue
-        self.detect_stop_flag = False
         self.detect_stop_cnt = 0
+        self.last_detect_time = 0
+        self.no_detect_cnt = 0 
+        self.backwards_flag = False
+        self.prev_detected_backwards = False
+        self.reverse_flag = False
+        self.wav_data, self.wav_samplerate = sf.read("sound/detect_backwards_ng.wav", dtype="float32")
 
+    def detect_backwards(self, names_in_frame):
+        now = time.time()
+        detected_backwards = any(name == "backwards" for name in names_in_frame) # このフレームで逆向き矢羽が 1つでもあったか？
+        # 2フレーム逆向き矢羽矢印検出時は矢羽矢印検出フラグと逆走中フラグセット
+        if detected_backwards and self.prev_detected_backwards:
+            if not self.backwards_flag:
+                if (now - self.last_detect_time) < 5:
+                    self.reverse_flag = True
+                self.last_detect_time = now # 検出した時間を更新
+            self.backwards_flag = True
+            self.no_detect_cnt = 0           
+        # 矢羽矢印未検出時は矢羽矢印検出フラグクリア
+        else:
+            self.no_detect_cnt += 1 # 未検出フレームが続いた回数をカウント
+            if self.no_detect_cnt >= 10: # 連続 clear_frames 回未検出ならフラグをクリア
+                self.backwards_flag = 0
+
+        self.prev_detected_backwards = detected_backwards
+
+        # 矢羽矢印検出から5秒未検出時は逆走フラグクリア
+        if (now - self.last_detect_time) > 5:
+            self.reverse_flag = False
+
+        return self.reverse_flag
+    
     def _xywh_to_xyxy(self, xywh):
         cx, cy, w, h = xywh.T
         return np.stack([cx - w/2, cy - h/2, cx + w/2, cy + h/2], axis=1)
@@ -138,11 +170,13 @@ class DetectStopAndBackwards:
 
             # 後処理
             name = ""
+            names_in_frame = []
             for box, sc, ci in self._postprocess(outs, CONF_THRES, IOU_THRES, SIZE, TOPK_PER_CLASS):
                 x1,y1,x2,y2 = box
                 X1, Y1, X2, Y2 = int(x1*sx), int(y1*sy), int(x2*sx), int(y2*sy)
                 cv2.rectangle(frame_bgr, (X1, Y1), (X2, Y2), (0,255,0), 1)
                 name = CLASS_NAMES[ci] if 0 <= ci < len(CLASS_NAMES) else str(ci)
+                names_in_frame.append(name)
                 cv2.putText(frame_bgr, f'{name}:{sc:.2f}', (X1, max(12, Y1-4)), font, 0.5, (0,255,0), 1, cv2.LINE_AA)
 
             # 交差点30m以内検知で一時停止を検出した時にﾌﾗｸﾞをｾｯﾄしてGPSﾀｽｸに通知する
@@ -155,6 +189,12 @@ class DetectStopAndBackwards:
                 self.detect_stop_cnt = 0
                 self.shared.detect_stop.clear()
                 
+            # 逆走検知 5秒以内に次の逆向き矢羽矢印を検出したらフラグセット 5秒未検出でクリア
+            reverse_flag = self.detect_backwards(names_in_frame)
+            if not self.shared.detect_reverse and reverse_flag:
+                sd.play(self.wav_data, self.wav_samplerate, blocking=False)
+            self.shared.detect_reverse = reverse_flag
+
             # FPS 表示
             dt = time.perf_counter() - t0
             fps_now = frames / dt if dt > 0 else 0.0

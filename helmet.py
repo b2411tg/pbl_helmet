@@ -1,7 +1,8 @@
 import threading
 from detect_stop_two.stop_and_right_turn_detect import Detect2ndTurn
-from yolo.yolo_object_detect import DetectStopAndBackwards
+from yolo.yolo_object_detect import DetectYoloObject
 from segmentation.detect_sidewalk_segmentation import DetectSidewalk
+from gnss.positioning import GetPositioning
 import cv2
 import queue
 from threading import Event
@@ -10,7 +11,8 @@ class Shared:
     def __init__(self):
         self.detect_stop = Event()
         self.detect_intersection_30m = Event()
-        
+        self.detect_reverse = Event()
+
 def put_latest(q: queue.Queue, item):
     try:
         q.put_nowait(item)
@@ -62,14 +64,17 @@ if __name__ == '__main__':
 
     # 各ﾀｽｸの設定
     detect_2ndturn = Detect2ndTurn(shared)
-    detect_stp_back = DetectStopAndBackwards(shared, in_queue=frame_yolo_out, out_queue=frame_yolo_in)
+    detect_stp_back = DetectYoloObject(shared, in_queue=frame_yolo_out, out_queue=frame_yolo_in)
     detect_sidewalk = DetectSidewalk(in_queue=frame_seg_out, out_queue=frame_seg_in)
+    get_positionig = GetPositioning()
     thread_2ndturn = threading.Thread(target=detect_2ndturn.main, daemon=True)
     thread_stp_back = threading.Thread(target=detect_stp_back.main, daemon=True)
     thread_sidewalk = threading.Thread(target=detect_sidewalk.main, daemon=True)
+    thread_positioning = threading.Thread(target=get_positionig.main, daemon=True)
     thread_2ndturn.start()
     thread_stp_back.start()
     #thread_sidewalk.start()
+    thread_positioning.start()
 
     main()
 
