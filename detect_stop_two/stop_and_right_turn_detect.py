@@ -7,6 +7,7 @@ import math
 import time
 import sounddevice as sd
 import soundfile as sf
+import numpy as np
 
 #PATH = "./detect_stop_two/gps_log_neo_f10n_20251021_213516.csv"
 #PATH = "./detect_stop_two/gps_log_20251116_134409.csv"
@@ -80,14 +81,21 @@ class Detect2ndTurn:
         near_lon = 0
 
         #TODO GPSから緯度経度取得
-        df = pd.read_csv(PATH)  # 列: UTC, latitude, longitude
-        for idx, r in df.iterrows():
-            time.sleep(0.1)            
+#        df = pd.read_csv(PATH)  # 列: UTC, latitude, longitude
+#        for idx, r in df.iterrows():
+#            time.sleep(0.1)            
+#            utc = r["UTC"]
+#            latitude = r["latitude"]]
+#            longitude = r["longitude"]
         #TODO ここまで
-            utc = r["UTC"]
-            latitude = r["latitude"]
-            longitude = r["longitude"]
-
+        while True:
+            self.shared.gnss_position_ready.wait()
+            pos = (self.shared.gnss_position).split(",")
+            utc = np.float64(pos[0])
+            latitude = np.float64(pos[1])
+            longitude = np.float64(pos[2])
+            self.shared.gnss_position_ready.clear()
+            
             if utc==16044475.0:
                 pass
             if utc==16044583.0:

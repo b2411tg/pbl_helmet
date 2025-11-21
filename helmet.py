@@ -12,6 +12,8 @@ class Shared:
         self.detect_stop = Event()
         self.detect_intersection_30m = Event()
         self.detect_reverse = Event()
+        self.gnss_position_ready = threading.Event()
+        self.gnss_position = None
 
 def put_latest(q: queue.Queue, item):
     try:
@@ -66,7 +68,7 @@ if __name__ == '__main__':
     detect_2ndturn = Detect2ndTurn(shared)
     detect_stp_back = DetectYoloObject(shared, in_queue=frame_yolo_out, out_queue=frame_yolo_in)
     detect_sidewalk = DetectSidewalk(in_queue=frame_seg_out, out_queue=frame_seg_in)
-    get_positionig = GetPositioning()
+    get_positionig = GetPositioning(shared)
     thread_2ndturn = threading.Thread(target=detect_2ndturn.main, daemon=True)
     thread_stp_back = threading.Thread(target=detect_stp_back.main, daemon=True)
     thread_sidewalk = threading.Thread(target=detect_sidewalk.main, daemon=True)
