@@ -6,6 +6,9 @@ from gnss.positioning import GetPositioning
 import cv2
 import queue
 from threading import Event
+import time
+import sounddevice as sd
+import soundfile as sf
 
 class Shared:
     def __init__(self):
@@ -14,6 +17,15 @@ class Shared:
         self.detect_reverse = Event()
         self.gnss_position_ready = threading.Event()
         self.gnss_position = None
+class RunningMsg:
+    def __init__(self):
+        self.wav_data_running, self.wav_samplerate_running = sf.read("sound/anzen_kanshi.wav", dtype="float32")
+
+    def run(self):
+        while True:
+            time.sleep(10)
+            sd.play(self.wav_data_running, self.wav_samplerate_running, blocking=False)
+
 
 def put_latest(q: queue.Queue, item):
     try:
@@ -47,7 +59,7 @@ def main():
             frame = frame_seg_in.get_nowait()
             cv2.imshow("SEGMENTATION DETECT", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+            break           
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
@@ -69,14 +81,17 @@ if __name__ == '__main__':
     detect_stp_back = DetectYoloObject(shared, in_queue=frame_yolo_out, out_queue=frame_yolo_in)
     detect_sidewalk = DetectSidewalk(in_queue=frame_seg_out, out_queue=frame_seg_in)
     get_positionig = GetPositioning(shared)
+    running_msg = RunningMsg()
     thread_2ndturn = threading.Thread(target=detect_2ndturn.main, daemon=True)
     thread_stp_back = threading.Thread(target=detect_stp_back.main, daemon=True)
     thread_sidewalk = threading.Thread(target=detect_sidewalk.main, daemon=True)
     thread_positioning = threading.Thread(target=get_positionig.main, daemon=True)
+    thread_running = threading.Thread(target=running_msg.run, daemon=True)
     thread_2ndturn.start()
     thread_stp_back.start()
     #thread_sidewalk.start()
     thread_positioning.start()
+    thread_running.start()
 
     main()
 
