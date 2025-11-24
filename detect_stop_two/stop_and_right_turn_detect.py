@@ -120,7 +120,7 @@ class Detect2ndTurn:
 
             if utc==50437.0:
                 pass
-            if utc==16044475.0:
+            if utc==16044475.6:
                 pass
             if utc==16044583.0:
                 pass
@@ -169,53 +169,55 @@ class Detect2ndTurn:
 
             # 前回検出地点から指定の半径は検出しない（重複防止）
             if self.detect_on == False:
+                self.shared.detect_intersection_30m.clear()
+                self.shared.detect_stop.clear()
                 self.from_detect_pos, _ = distance_and_bearing_east0(self.detect_pos[0], self.detect_pos[1], latitude, longitude)
                 if self.from_detect_pos < DETECT_STOP_RADIUS:
                     st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}'
                     self.out_result(st)
                     continue
                 else:
-                    self.shared.detect_intersection_30m.clear()
                     self.detect_on = True
                     turn_stop_ok_flag = False
 
             # 近くの交差点検出位置が変化したら検出リセット
             if prev_near_lat != near_lat and prev_near_lon != near_lon:
                 self.shared.detect_intersection_30m.clear()
+                self.shared.detect_stop.clear()
                 turn_stop_ok_flag = False
 
-            # 交差点まで30m以内か
+            # 交差点まで30m以上の時は監視フラグクリア
             if match_intersection_distance > 30:
                 st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}'
                 self.out_result(st)
                 self.shared.detect_intersection_30m.clear()
-                leave_cnt = 0
+                self.shared.detect_stop.clear()
                 turn_stop_ok_flag = False
+                leave_cnt = 0
                 continue
             
             # 交差点に近づいていってるか
-            if not self.shared.detect_intersection_30m.is_set() and self.match_prev_distance < match_intersection_distance:
-                st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}'
-                self.out_result(st)
-                self.shared.detect_intersection_30m.clear()
-                leave_cnt = 0
-                continue
+#            if not self.shared.detect_intersection_30m.is_set() and self.match_prev_distance < match_intersection_distance:
+#                st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}'
+#                self.out_result(st)
+#                leave_cnt = 0
+#                continue
             # 交差点及び一時停止監視中に交差点が離れていった場合は一時停止違反と判定
-            elif self.shared.detect_intersection_30m.is_set() and self.shared.detect_stop.is_set() and self.nomatch_prev_distance < nomatch_intersection_distance:
+            if self.shared.detect_intersection_30m.is_set() and self.shared.detect_stop.is_set() and self.nomatch_prev_distance < nomatch_intersection_distance:
+ #           elif self.shared.detect_intersection_30m.is_set() and self.shared.detect_stop.is_set() and self.nomatch_prev_distance < nomatch_intersection_distance:
                 # 離れていく軌跡連続5回でNGと判断
                 leave_cnt += 1
                 if leave_cnt >= 5:
                     st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}, "detect_stop_NG"'
                     self.out_result(st)
                     sd.play(self.wav_data_stop_ng, self.wav_samplerate_stop_ng, blocking=False)
-                    self.shared.detect_intersection_30m.clear()
                     self.detect_pos = [latitude, longitude]
                     self.detect_on = False   # 指定の半径は検出を停止する（重複防止）
                     continue
             else:
                 leave_cnt = 0
             
-            # 交差点監視ﾌﾗｸﾞ及び走行方向を保存
+            # 交差点までの距離30m以内になったら交差点監視ﾌﾗｸﾞ及び走行方向セット
             if not self.shared.detect_intersection_30m.is_set():
                 self.shared.detect_intersection_30m.set()
                 save_running_direction = angle_deg
@@ -235,7 +237,7 @@ class Detect2ndTurn:
 
             # 元データは走行中か
             if former_move_distance < DETECT_MOVE_DISTANCE:
-                # 元データにおいて停止中と判断した時 、一時停止監視中か
+                # 元データにおいて一時停止監視中でない場合
                 if not self.shared.detect_stop.is_set():                
 
                     # TODO 交差点超えて停止していた場合、二段階右折正常監視開始
@@ -254,6 +256,7 @@ class Detect2ndTurn:
                 if former_move_distance > 1:                 
                     st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}'
                     self.out_result(st)
+                    continue
                 # 一時停止監視中、停止したと確認できた為、OKと判定
                 st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}, "detect_stop_OK"'
                 self.out_result(st)
@@ -288,7 +291,7 @@ class Detect2ndTurn:
                 continue
 
             # ここまできたら二段階右折違反条件成立
-            st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}, "detect_2nd_turn"'
+            st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}, "detect_2nd_turn_ng"'
             self.out_result(st)
             sd.play(self.wav_data_turn_ng, self.wav_samplerate_turn_ng, blocking=False)
             self.detect_pos = [latitude, longitude]
