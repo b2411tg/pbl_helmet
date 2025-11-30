@@ -86,10 +86,16 @@ class Detect2ndTurn:
         except Exception as e:
             print(e)
             return False
+        
     def out_result(self, st):
         print(st)
         self.f.writelines(st + '\n')
         self.f.flush()
+        ary = st.split(",")
+        x = float(ary[0])
+        if (x - int(x)) == 0.0:
+            self.shared.sql_insert_data = st
+            self.shared.sql_insert_line.set()
 
     def main(self):
         self.open_csv()
@@ -213,6 +219,7 @@ class Detect2ndTurn:
                     sd.play(self.wav_data_stop_ng, self.wav_samplerate_stop_ng, blocking=False)
                     self.detect_pos = [latitude, longitude]
                     self.detect_on = False   # 指定の半径は検出を停止する（重複防止）
+                    self.shared.detect_status = 1  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
                     continue
             else:
                 leave_cnt = 0
@@ -263,6 +270,7 @@ class Detect2ndTurn:
                 sd.play(self.wav_data_stop_ok, self.wav_samplerate_stop_ok, blocking=False)
                 self.detect_pos = [latitude, longitude]
                 self.detect_on = False   # 指定の半径は検出を停止する（重複防止）
+                self.shared.detect_status = 11  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
                 continue
 
             # 走行していた場合二段階右折は右に40度以上の変化とする
@@ -285,6 +293,7 @@ class Detect2ndTurn:
                     sd.play(self.wav_data_turn_ok, self.wav_samplerate_turn_ng, blocking=False)
                     self.detect_pos = [latitude, longitude]
                     self.detect_on = False   # 指定の半径は検出を停止する（重複防止）
+                    self.shared.detect_status = 44  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
                 else:
                     st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}'
                     self.out_result(st)
@@ -296,6 +305,7 @@ class Detect2ndTurn:
             sd.play(self.wav_data_turn_ng, self.wav_samplerate_turn_ng, blocking=False)
             self.detect_pos = [latitude, longitude]
             self.detect_on = False   # 指定の半径は検出を停止する（重複防止）
+            self.shared.detect_status = 4   # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
 
 if __name__ == "__main__":
     detect = Detect2ndTurn()

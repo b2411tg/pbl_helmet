@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 import sys
+from datetime import datetime, timedelta
 
 class GetPositioning:
     def __init__(self, shared):
@@ -33,7 +34,7 @@ class GetPositioning:
     def get_pos(self):
         while(True):
             line = self.ser.readline().decode(errors="ignore").strip()
-            if line and line.startswith("$GPGGA"):
+            if line and line.startswith("$GPRMC"):
                 self.line = line.split(',')
                 break
 
@@ -42,11 +43,25 @@ class GetPositioning:
         minutes = coord - deg * 100
         return round(deg + minutes / 60, 8)
 
+    def utc_to_jst_str(self, time, date):
+        dd = int(date[0:2])
+        MM = int(date[2:4])
+        year = 2000 + int(date[4:6])
+        hh = int(time[0:2])
+        mm = int(time[2:4])
+        ss = int(time[4:6])
+        dt_utc = datetime(year, MM, dd, hh, mm, ss)
+        dt_jst = dt_utc + timedelta(hours=9)
+        return dt_jst.strftime('%Y%m%d%H%M%S') + time[6:8]
+    
     def save_pos(self):
-        if self.line[0] == '$GPGGA':
-            latitude = self.gga_to_decimal(float(self.line[2]))
-            longitude = self.gga_to_decimal(float(self.line[4]))
-            data = f'{float(self.line[1]):.1f},{latitude:.8f},{longitude:.8f}'
+        if self.line[0] == '$GPRMC':
+            if not self.line[3] and not self.line[5]:
+                return
+            jst_str = self.utc_to_jst_str(self.line[1], self.line[9])
+            latitude = self.gga_to_decimal(float(self.line[3]))
+            longitude = self.gga_to_decimal(float(self.line[5]))
+            data = f'{jst_str},{latitude:.8f},{longitude:.8f}'
             self.shared.gnss_position = data
             self.shared.gnss_position_ready.set()
 #            print(data)

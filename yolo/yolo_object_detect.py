@@ -36,7 +36,8 @@ class DetectYoloObject:
         self.backwards_flag = False
         self.prev_detected_backwards = False
         self.reverse_flag = False
-        self.wav_data, self.wav_samplerate = sf.read("sound/detect_backwards_ng.wav", dtype="float32")
+        self.wav_data_ng, self.wav_samplerate_ng = sf.read("sound/detect_backwards_ng.wav", dtype="float32")
+        self.wav_data_ing, self.wav_samplerate_ing = sf.read("sound/detect_backwards_ing.wav", dtype="float32")
 
     def detect_backwards(self, names_in_frame):
         now = time.time()
@@ -191,9 +192,19 @@ class DetectYoloObject:
                 
             # 逆走検知 5秒以内に次の逆向き矢羽矢印を検出したらフラグセット 5秒未検出でクリア
             reverse_flag = self.detect_backwards(names_in_frame)
-            if not self.shared.detect_reverse and reverse_flag:
-                sd.play(self.wav_data, self.wav_samplerate, blocking=False)
-            self.shared.detect_reverse = reverse_flag
+            if not self.shared.detect_reverse.is_set() and reverse_flag:
+                sd.play(self.wav_data_ng, self.wav_samplerate_ng, blocking=False)
+                self.shared.detect_status = 2  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
+                last_reverse_detect_time = time.time()
+                self.shared.detect_reverse.set()
+            elif self.shared.detect_status == 2 and reverse_flag == 0:
+                self.shared.detect_status = 0  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
+                self.shared.detect_reverse.clear()
+
+            # 逆走中は5秒周期で警告
+            if self.shared.detect_reverse.is_set() and (time.time() - last_reverse_detect_time) > 5:
+                last_reverse_detect_time = time.time()
+                sd.play(self.wav_data_ing, self.wav_samplerate_ing, blocking=False)
 
             # FPS 表示
             dt = time.perf_counter() - t0
