@@ -124,4 +124,7 @@ class PostgreSQL:
             if self.shared.detect_status == 0 or self.shared.detect_status == 2:
                 continue
             else:
-                self.shared.detect_status = 0   # 逆走中以外はｽﾃｰﾀｽｸﾘｱ
+                if self.shared.detect_reverse.is_set():
+                    self.shared.detect_status = 2   # 逆走中の時はｽﾃｰﾀｽは逆走中に戻す
+                else:
+                    self.shared.detect_status = 0   # 逆走中以外はｽﾃｰﾀｽｸﾘｱ

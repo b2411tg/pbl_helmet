@@ -21,6 +21,7 @@ class Shared:
         self.sql_insert_line = threading.Event()
         self.sql_insert_data = None
         self.detect_status = 0
+        self.stop_wav_run = False
 
 class RunningMsg:
     def __init__(self, shared):
@@ -31,7 +32,7 @@ class RunningMsg:
         sd.play(self.wav_data_running, self.wav_samplerate_running, blocking=False)
         while True:
             time.sleep(10)
-            if not self.shared.detect_reverse.is_set():
+            if self.shared.detect_status != 2 and not self.shared.stop_wav_run:
                 sd.play(self.wav_data_running, self.wav_samplerate_running, blocking=False)
 
 

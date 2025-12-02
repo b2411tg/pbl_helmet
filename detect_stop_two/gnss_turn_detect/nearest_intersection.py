@@ -7,14 +7,25 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import os
-INTERSECTIONS_PATH = Path("./detect_stop_two/map/intersection_nodes.geojson")
+INTERSECTIONS_PATH = Path("./detect_stop_two/map/intersection_nodes_signal.geojson")
 
 def _load_intersections(path: Path = INTERSECTIONS_PATH):
     if not path.exists():
         raise FileNotFoundError(f"Intersection file not found: {path}")
     with open(path, "r", encoding="utf-8") as f:
         gj = json.load(f)
-    lats, lons = [], []
+    lats, lons, signals = [], [], []
+
+    def _to_bool(v):
+        """has_signal の値を安全に bool に変換"""
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, (int, np.integer)):
+            return v != 0
+        if isinstance(v, str):
+            return v.strip().lower() in ("1", "true", "t", "yes", "y")
+        return False
+
     for feat in gj.get("features", []):
         geom = feat.get("geometry", {})
         if geom.get("type") == "Point":
@@ -26,13 +37,17 @@ def _load_intersections(path: Path = INTERSECTIONS_PATH):
                 and coords[1] is not None
             ):
                 lon, lat = float(coords[0]), float(coords[1])
+                props = feat.get("properties", {}) or {}
+                has_signal = _to_bool(props.get("has_signal", False))
                 lats.append(lat)
                 lons.append(lon)
+                signals.append(has_signal)
     if not lats:
         raise ValueError("No Point geometries found in intersection_nodes.geojson")
-    return np.array(lats, dtype=float), np.array(lons, dtype=float)
+    
+    return np.array(lats, dtype=float), np.array(lons, dtype=float), np.array(signals, dtype=bool)
 
-_INTER_LAT, _INTER_LON = _load_intersections()
+_INTER_LAT, _INTER_LON , _INTER_SIGNAL = _load_intersections()
 
 def _haversine_vec(lat1, lon1, lat2_arr, lon2_arr):
     lat1 = np.radians(lat1)
@@ -56,7 +71,7 @@ def nearest_intersection(lat: float, lon: float):
 def nearest_intersection_with_distance(lat: float, lon: float):
     d = _haversine_vec(lat, lon, _INTER_LAT, _INTER_LON)
     idx = int(np.argmin(d))
-    return float(_INTER_LAT[idx]), float(_INTER_LON[idx]), float(d[idx])
+    return float(_INTER_LAT[idx]), float(_INTER_LON[idx]), float(d[idx]), bool(_INTER_SIGNAL[idx])
 
 def batch_nearest_intersection(df: pd.DataFrame, lat_col="lat", lon_col="lon"):
     lats = df[lat_col].to_numpy(dtype=float)
@@ -64,6 +79,7 @@ def batch_nearest_intersection(df: pd.DataFrame, lat_col="lat", lon_col="lon"):
     inter_lat = np.empty_like(lats, dtype=float)
     inter_lon = np.empty_like(lons, dtype=float)
     inter_dist = np.empty_like(lats, dtype=float)
+    inter_has_signal = np.empty_like(lats, dtype=bool)
     CHUNK = 10000
     for start in range(0, len(lats), CHUNK):
         end = start + CHUNK
@@ -73,8 +89,10 @@ def batch_nearest_intersection(df: pd.DataFrame, lat_col="lat", lon_col="lon"):
             inter_lat[start + i] = _INTER_LAT[idx]
             inter_lon[start + i] = _INTER_LON[idx]
             inter_dist[start + i] = d[idx]
+            inter_has_signal[start + i] = _INTER_SIGNAL[idx]
     out = df.copy()
     out["inter_lat"] = inter_lat
     out["inter_lon"] = inter_lon
     out["inter_dist_m"] = inter_dist
+    out["inter_has_signal"] = inter_has_signal
     return out

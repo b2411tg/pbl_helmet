@@ -193,13 +193,13 @@ class DetectYoloObject:
             # 逆走検知 5秒以内に次の逆向き矢羽矢印を検出したらフラグセット 5秒未検出でクリア
             reverse_flag = self.detect_backwards(names_in_frame)
             if not self.shared.detect_reverse.is_set() and reverse_flag:
-                sd.play(self.wav_data_ng, self.wav_samplerate_ng, blocking=False)
                 self.shared.detect_status = 2  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
                 last_reverse_detect_time = time.time()
                 self.shared.detect_reverse.set()
+                sd.play(self.wav_data_ng, self.wav_samplerate_ng, blocking=False)
             elif self.shared.detect_status == 2 and reverse_flag == 0:
-                self.shared.detect_status = 0  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
                 self.shared.detect_reverse.clear()
+                self.shared.detect_status = 0  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
 
             # 逆走中は5秒周期で警告
             if self.shared.detect_reverse.is_set() and (time.time() - last_reverse_detect_time) > 5:

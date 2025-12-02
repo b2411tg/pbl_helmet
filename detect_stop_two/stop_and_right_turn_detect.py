@@ -107,6 +107,7 @@ class Detect2ndTurn:
         leave_cnt = 0
         near_lat = 0
         near_lon = 0
+        signal_flag = False
 
         #TODO GPSから緯度経度取得
 #        df = pd.read_csv(PATH)  # 列: UTC, latitude, longitude
@@ -154,8 +155,8 @@ class Detect2ndTurn:
                 self.nomatch_prev_distance = nomatch_intersection_distance
                 prev_near_lat = near_lat
                 prev_near_lon = near_lon
-                near_lat, near_lon, match_intersection_distance = nearest_intersection_with_distance(match_lat, match_lon)
-                _, _, nomatch_intersection_distance = nearest_intersection_with_distance(latitude, longitude)
+                near_lat, near_lon, match_intersection_distance, signal = nearest_intersection_with_distance(match_lat, match_lon)
+                _, _, nomatch_intersection_distance, _ = nearest_intersection_with_distance(latitude, longitude)
                 self.prev_match_data.append((utc, match_lat, match_lon, match_heading, match_intersection_distance))
                 self.prev_former_data.append((utc, latitude, longitude, angle_deg, former_move_distance))
             except:
@@ -185,12 +186,20 @@ class Detect2ndTurn:
                 else:
                     self.detect_on = True
                     turn_stop_ok_flag = False
+                    signal_flag = False
+                    self.shared.stop_wav_run = False
 
             # 近くの交差点検出位置が変化したら検出リセット
             if prev_near_lat != near_lat and prev_near_lon != near_lon:
                 self.shared.detect_intersection_30m.clear()
                 self.shared.detect_stop.clear()
                 turn_stop_ok_flag = False
+                signal_flag = False
+
+                # 信号機の有る交差点の場合信号機フラグセット
+                if not signal_flag and signal:
+                    signal_flag = True
+
 
             # 交差点まで30m以上の時は監視フラグクリア
             if match_intersection_distance > 30:
@@ -199,27 +208,22 @@ class Detect2ndTurn:
                 self.shared.detect_intersection_30m.clear()
                 self.shared.detect_stop.clear()
                 turn_stop_ok_flag = False
+                signal_flag = False
                 leave_cnt = 0
                 continue
             
-            # 交差点に近づいていってるか
-#            if not self.shared.detect_intersection_30m.is_set() and self.match_prev_distance < match_intersection_distance:
-#                st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}'
-#                self.out_result(st)
-#                leave_cnt = 0
-#                continue
             # 交差点及び一時停止監視中に交差点が離れていった場合は一時停止違反と判定
             if self.shared.detect_intersection_30m.is_set() and self.shared.detect_stop.is_set() and self.nomatch_prev_distance < nomatch_intersection_distance:
- #           elif self.shared.detect_intersection_30m.is_set() and self.shared.detect_stop.is_set() and self.nomatch_prev_distance < nomatch_intersection_distance:
                 # 離れていく軌跡連続5回でNGと判断
                 leave_cnt += 1
                 if leave_cnt >= 5:
+                    self.shared.stop_wav_run = True # 安全監視中音声を出さない
+                    self.shared.detect_status = 1  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
                     st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}, "detect_stop_NG"'
                     self.out_result(st)
                     sd.play(self.wav_data_stop_ng, self.wav_samplerate_stop_ng, blocking=False)
                     self.detect_pos = [latitude, longitude]
                     self.detect_on = False   # 指定の半径は検出を停止する（重複防止）
-                    self.shared.detect_status = 1  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
                     continue
             else:
                 leave_cnt = 0
@@ -265,17 +269,18 @@ class Detect2ndTurn:
                     self.out_result(st)
                     continue
                 # 一時停止監視中、停止したと確認できた為、OKと判定
+                self.shared.stop_wav_run = True # 安全監視中音声を出さない
+                self.shared.detect_status = 11  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
                 st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}, "detect_stop_OK"'
                 self.out_result(st)
                 sd.play(self.wav_data_stop_ok, self.wav_samplerate_stop_ok, blocking=False)
                 self.detect_pos = [latitude, longitude]
                 self.detect_on = False   # 指定の半径は検出を停止する（重複防止）
-                self.shared.detect_status = 11  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
                 continue
 
-            # 走行していた場合二段階右折は右に40度以上の変化とする
+            # 走行していた場合二段階右折は右に35度以上の変化とする
             deg = (save_running_direction - angle_deg) % 360
-            if not (40 < deg < 180):
+            if not (35 < deg < 180):
                 st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}'
                 self.out_result(st)
                 continue
@@ -287,25 +292,41 @@ class Detect2ndTurn:
                          near_lat, near_lon)
             deg = (intersection_angle_deg - angle_deg) % 360
             if 180 < deg < 360:                                       # 走行方角に対し交差点は右側か左側か
-                if turn_stop_ok_flag:
+                # 二段階右折において信号機の有る交差点の場合
+                if signal_flag:
+                    # 信号待ちを確認できた場合OK
+                    if turn_stop_ok_flag:
+                        self.shared.stop_wav_run = True # 安全監視中音声を出さない
+                        self.shared.detect_status = 44  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
+                        st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}, detect_2nd_turn_ok'
+                        self.out_result(st)
+                        sd.play(self.wav_data_turn_ok, self.wav_samplerate_turn_ng, blocking=False)
+                    # 信号待ちを確認できなかった場合NG
+                    else:
+                        self.shared.stop_wav_run = True # 安全監視中音声を出さない
+                        self.shared.detect_status = 4   # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
+                        st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}, "detect_2nd_turn_ng"'
+                        self.out_result(st)
+                        sd.play(self.wav_data_turn_ng, self.wav_samplerate_turn_ng, blocking=False)
+                # 二段階右折において信号機の無い交差点の場合OK
+                else:
+                    self.shared.stop_wav_run = True # 安全監視中音声を出さない
+                    self.shared.detect_status = 44  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
                     st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}, detect_2nd_turn_ok'
                     self.out_result(st)
                     sd.play(self.wav_data_turn_ok, self.wav_samplerate_turn_ng, blocking=False)
-                    self.detect_pos = [latitude, longitude]
-                    self.detect_on = False   # 指定の半径は検出を停止する（重複防止）
-                    self.shared.detect_status = 44  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
-                else:
-                    st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}'
-                    self.out_result(st)
+                self.detect_pos = [latitude, longitude]
+                self.detect_on = False   # 指定の半径は検出を停止する（重複防止）
                 continue
 
             # ここまできたら二段階右折違反条件成立
+            self.shared.stop_wav_run = True # 安全監視中音声を出さない
+            self.shared.detect_status = 4   # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
             st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, head:{angle_deg:.6f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, 密度:{prev_density_distance_m:.6f}, "detect_2nd_turn_ng"'
             self.out_result(st)
             sd.play(self.wav_data_turn_ng, self.wav_samplerate_turn_ng, blocking=False)
             self.detect_pos = [latitude, longitude]
             self.detect_on = False   # 指定の半径は検出を停止する（重複防止）
-            self.shared.detect_status = 4   # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
 
 if __name__ == "__main__":
     detect = Detect2ndTurn()
