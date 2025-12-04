@@ -14,7 +14,9 @@ from pathlib import Path
 #PATH = "./detect_stop_two/gps_log_neo_f10n_20251021_213516.csv"
 #PATH = "./detect_stop_two/gps_log_20251116_134409.csv"
 #PATH = "./detect_stop_two/gps_log_20251116_134409_1.csv"
-PATH = "./detect_stop_two/gps_log_20251118_140059.csv"
+#PATH = "./detect_stop_two/gps_log_20251118_140059.csv"
+PATH = "./detect_stop_two/gps_log_20251203_210009_former.csv"
+PATH = "./detect_stop_two/test.csv"
 PREV_DENSITY_DATA = 7           # 密集を検出するデータの範囲
 DENSITY_DETECT_DISTANCE = 1.5   # 密集を検出する範囲(m)
 PREV_SAVE_SIZE = 10             # 検出に使用する為のデータ保存数
@@ -96,7 +98,7 @@ class Detect2ndTurn:
         if (x - int(x)) == 0.0:
             self.shared.sql_insert_data = st
             self.shared.sql_insert_line.set()
-
+    
     def main(self):
         self.open_csv()
         match_intersection_distance = 0
@@ -110,20 +112,20 @@ class Detect2ndTurn:
         signal_flag = False
 
         #TODO GPSから緯度経度取得
-#        df = pd.read_csv(PATH)  # 列: UTC, latitude, longitude
-#        for idx, r in df.iterrows():
-#            time.sleep(0.1)            
-#            utc = r["UTC"]
-#            latitude = r["latitude"]
-#            longitude = r["longitude"]
+        df = pd.read_csv(PATH)  # 列: UTC, latitude, longitude
+        for idx, r in df.iterrows():
+            time.sleep(0.1)            
+            utc = r["UTC"]
+            latitude = r["latitude"]
+            longitude = r["longitude"]
         #TODO ここまで
-        while True:
-            self.shared.gnss_position_ready.wait()
-            pos = (self.shared.gnss_position).split(",")
-            utc = np.float64(pos[0])
-            latitude = np.float64(pos[1])
-            longitude = np.float64(pos[2])
-            self.shared.gnss_position_ready.clear()
+#        while True:
+#            self.shared.gnss_position_ready.wait()
+#            pos = (self.shared.gnss_position).split(",")
+#            utc = np.float64(pos[0])
+#            latitude = np.float64(pos[1])
+#            longitude = np.float64(pos[2])
+#            self.shared.gnss_position_ready.clear()
 
             if utc==50437.0:
                 pass
@@ -208,7 +210,7 @@ class Detect2ndTurn:
                 self.shared.detect_intersection_30m.clear()
                 self.shared.detect_stop.clear()
                 turn_stop_ok_flag = False
-                signal_flag = False
+                #signal_flag = False
                 leave_cnt = 0
                 continue
             

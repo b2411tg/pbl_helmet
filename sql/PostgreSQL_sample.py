@@ -107,7 +107,7 @@ class PostgreSQL:
                 print(e)
                 return False
         con.commit()                #確定
-        print(sql)
+        #print(sql)
         return True
 
     def main(self):

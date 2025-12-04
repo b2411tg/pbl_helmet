@@ -22,7 +22,7 @@ class GetPositioning:
     def open_csv(self):
         try:   
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            csv_path = Path(f"gps_log_{ts}.csv")
+            csv_path = Path(f"gps_log_{ts}_former.csv")
             self.f = open(csv_path, "w", newline="", encoding="utf-8")
             column_name = 'UTC,latitude,longitude\n'
             self.f.writelines(column_name)
@@ -65,14 +65,14 @@ class GetPositioning:
             self.shared.gnss_position = data
             self.shared.gnss_position_ready.set()
 #            print(data)
-#            self.f.writelines(data + '\n')
-#            self.f.flush()
+            self.f.writelines(data + '\n')
+            self.f.flush()
 
     def main(self):
         if self.gps_init() == False:
             sys.exit()
-#        if self.open_csv() == False:
-#            sys.exit()
+        if self.open_csv() == False:
+            sys.exit()
         while(True):
             self.get_pos()
             self.save_pos()
