@@ -1,7 +1,6 @@
 from detect_stop_two.gnss_turn_detect.nearest_intersection import nearest_intersection, nearest_intersection_with_distance
 from detect_stop_two.gnss_turn_detect.distance_and_bearing import distance_and_bearing_east0
 from detect_stop_two.gnss_turn_detect.online_matcher import OfflineSequentialMatcher
-from detect_stop_two.gnss_turn_detect.nearest_center_line import has_crossed_centerline
 import pandas as pd
 from collections import deque
 import math
@@ -16,8 +15,8 @@ from pathlib import Path
 #PATH = "./detect_stop_two/gps_log_20251116_134409.csv"
 #PATH = "./detect_stop_two/gps_log_20251116_134409_1.csv"
 #PATH = "./detect_stop_two/gps_log_20251118_140059.csv"
-PATH = "./detect_stop_two/gps_log_20251203_210009_former.csv"
-#PATH = "./detect_stop_two/test.csv"
+#PATH = "./detect_stop_two/gps_log_20251203_210009_former.csv"
+PATH = "./detect_stop_two/test.csv"
 PREV_DENSITY_DATA = 7           # 密集を検出するデータの範囲
 DENSITY_DETECT_DISTANCE = 1.5   # 密集を検出する範囲(m)
 PREV_SAVE_SIZE = 10             # 検出に使用する為のデータ保存数
@@ -111,7 +110,8 @@ class Detect2ndTurn:
         near_lat = 0
         near_lon = 0
         signal_flag = False
-        save_running_direction = 0
+        former_10m_angle = -1
+        match_10m_angle = -1
 
         #TODO GPSから緯度経度取得
         df = pd.read_csv(PATH)  # 列: UTC, latitude, longitude
@@ -139,15 +139,19 @@ class Detect2ndTurn:
                 pass
             if utc==50712.0:
                 pass
+            if utc==20251203210642.0:
+                pass
+            if utc==20251203211429.0:
+                pass
 
             ''' これよりマッチング緯度経度取得、移動距離取得、走行方向取得、交差点緯度経度距離処理 '''
 
             # 現在の緯度経度と前の緯度経度から移動距離、方角を取得
-            former_move_distance, angle_deg, heading = self._get_heading_distance(latitude, longitude)
+            former_move_distance, former_now_angle, heading = self._get_heading_distance(latitude, longitude)
             
             if len(self.prev_former_data) ==10:
-                _, angle_deg = distance_and_bearing_east0(self.prev_former_data[PREV_SAVE_SIZE-1][1], self.prev_former_data[PREV_SAVE_SIZE-1][2],
-                        self.prev_former_data[PREV_SAVE_SIZE-10][1], self.prev_former_data[PREV_SAVE_SIZE-10][2])
+                _, former_now_angle = distance_and_bearing_east0(self.prev_former_data[PREV_SAVE_SIZE-10][1], self.prev_former_data[PREV_SAVE_SIZE-10][2],
+                        self.prev_former_data[PREV_SAVE_SIZE-1][1], self.prev_former_data[PREV_SAVE_SIZE-1][2])
 
 
             # マップマッチングデータ取得（緯度、経度、走行方角、走行距離m/s
@@ -167,17 +171,17 @@ class Detect2ndTurn:
                 near_lat, near_lon, match_intersection_distance, signal = nearest_intersection_with_distance(match_lat, match_lon)
                 _, _, nomatch_intersection_distance, _ = nearest_intersection_with_distance(latitude, longitude)
                 self.prev_match_data.append((utc, match_lat, match_lon, match_heading, match_intersection_distance))
-                self.prev_former_data.append((utc, latitude, longitude, angle_deg, former_move_distance))
+                self.prev_former_data.append((utc, latitude, longitude, former_now_angle, former_move_distance))
             except:
                 self.prev_match_data.append((utc, match_lat, match_lon, match_heading, match_intersection_distance))
-                self.prev_former_data.append((utc, latitude, longitude, angle_deg, former_move_distance))
-                st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, run_angle:{save_running_direction:.1f}, head:{angle_deg:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}'
+                self.prev_former_data.append((utc, latitude, longitude, former_now_angle, former_move_distance))
+                st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}'
                 self.out_result(st)
                 continue
 
             # データが指定数保存されるまでは検知に移行しない
             if len(self.prev_match_data) < PREV_SAVE_SIZE:
-                st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, run_angle:{save_running_direction:.1f}, head:{angle_deg:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}'
+                st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}'
                 self.out_result(st)
                 continue
 
@@ -189,7 +193,7 @@ class Detect2ndTurn:
                 self.shared.detect_stop.clear()
                 self.from_detect_pos, _ = distance_and_bearing_east0(self.detect_pos[0], self.detect_pos[1], latitude, longitude)
                 if self.from_detect_pos < DETECT_STOP_RADIUS:
-                    st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, run_angle:{save_running_direction:.1f}, head:{angle_deg:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}'
+                    st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}'
                     self.out_result(st)
                     continue
                 else:
@@ -204,6 +208,8 @@ class Detect2ndTurn:
                 self.shared.detect_stop.clear()
                 turn_stop_ok_flag = False
                 signal_flag = False
+                former_10m_angle = -1
+                match_10m_angle = -1
 
                 # 信号機の有る交差点の場合信号機フラグセット
                 if not signal_flag and signal:
@@ -212,7 +218,7 @@ class Detect2ndTurn:
 
             # 交差点まで30m以上の時は監視フラグクリア
             if match_intersection_distance > 30:
-                st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, run_angle:{save_running_direction:.1f}, head:{angle_deg:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}'
+                st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}'
                 self.out_result(st)
                 self.shared.detect_intersection_30m.clear()
                 self.shared.detect_stop.clear()
@@ -228,7 +234,7 @@ class Detect2ndTurn:
                 if leave_cnt >= 5:
                     self.shared.stop_wav_run = True # 安全監視中音声を出さない
                     self.shared.detect_status = 1  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
-                    st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, run_angle:{save_running_direction:.1f}, head:{angle_deg:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}, detect_stop_NG'
+                    st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}, detect_stop_NG'
                     self.out_result(st)
                     sd.play(self.wav_data_stop_ng, self.wav_samplerate_stop_ng, blocking=False)
                     self.detect_pos = [latitude, longitude]
@@ -240,8 +246,15 @@ class Detect2ndTurn:
             # 交差点までの距離30m以内になったら交差点監視ﾌﾗｸﾞ及び走行方向セット
             if not self.shared.detect_intersection_30m.is_set():
                 self.shared.detect_intersection_30m.set()
-                save_running_direction = angle_deg
 
+            # 交差点までの距離10m未満になったら交差点までの角度を取得（右折を検出する際の基準角度）
+            if former_10m_angle == -1 and match_intersection_distance < 10:
+                former_10m_angle = former_now_angle
+                _, match_10m_angle = distance_and_bearing_east0(match_lat, match_lon, near_lat, near_lon)
+                match_10m_lat = match_lat
+                match_10m_lon = match_lon
+
+                
             # マップマッチングデータにおける密集度算出（指定の過去データと距離を算出）
             subset = list(self.prev_match_data)[PREV_SAVE_SIZE-PREV_DENSITY_DATA: PREV_SAVE_SIZE]
             column_distance = [row[4] for row in subset]
@@ -251,7 +264,7 @@ class Detect2ndTurn:
 
             # ﾏｯﾁﾝｸﾞﾃﾞｰﾀは指定の距離の範囲内に密集しているか
             if prev_density_distance_m > DENSITY_DETECT_DISTANCE:
-                st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, run_angle:{save_running_direction:.1f}, head:{angle_deg:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}'
+                st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}'
                 self.out_result(st)
                 continue
 
@@ -261,26 +274,26 @@ class Detect2ndTurn:
                 if not self.shared.detect_stop.is_set():                
 
                     # TODO 交差点超えて停止していた場合、二段階右折正常監視開始
-                    _, intersection_angle_deg = distance_and_bearing_east0( # 交差点の方角取得
+                    _, intersection_former_now_angle = distance_and_bearing_east0( # 交差点の方角取得
                         self.prev_former_data[PREV_SAVE_SIZE-1][1],
                         self.prev_former_data[PREV_SAVE_SIZE-1][2],
                              near_lat, near_lon)
-                    deg = (save_running_direction - intersection_angle_deg) % 360
+                    deg = (former_10m_angle - intersection_former_now_angle) % 360
                     if deg > 90 and deg < 270 :
                         if former_move_distance < 1:                 
                             turn_stop_ok_flag = True
-                    st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, run_angle:{save_running_direction:.1f}, head:{angle_deg:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}'
+                    st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}'
                     self.out_result(st)
                     continue    # 一時停止監視中でない時は判定なし
                 # 一時停止監視中の場合、元データは停止状態か確認 1m/s
                 if former_move_distance > 1:                 
-                    st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, run_angle:{save_running_direction:.1f}, head:{angle_deg:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}'
+                    st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}'
                     self.out_result(st)
                     continue
                 # 一時停止監視中、停止したと確認できた為、OKと判定
                 self.shared.stop_wav_run = True # 安全監視中音声を出さない
                 self.shared.detect_status = 11  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
-                st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, run_angle:{save_running_direction:.1f}, head:{angle_deg:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}, "detect_stop_OK"'
+                st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}, "detect_stop_OK"'
                 self.out_result(st)
                 sd.play(self.wav_data_stop_ok, self.wav_samplerate_stop_ok, blocking=False)
                 self.detect_pos = [latitude, longitude]
@@ -288,25 +301,27 @@ class Detect2ndTurn:
                 continue
 
             # 走行していた場合二段階右折は右に40度以上の変化とする
-            deg = (save_running_direction - angle_deg) % 360
+            deg = (former_10m_angle - former_now_angle) % 360
             if not (40 < deg < 180):
-                st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, run_angle:{save_running_direction:.1f}, head:{angle_deg:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}'
+                st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}'
                 self.out_result(st)
                 continue
             
-            result = has_crossed_centerline(latitude, longitude, angle_deg, near_lat, near_lon, "/home/radxa/Project/pbl_helmet/detect_stop_two/map/roads.geojson")
-            
-            if not result:
-                st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, run_angle:{save_running_direction:.1f}, head:{angle_deg:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}, center:{result}'
+            # 右折中の検出位置は交差点中心線を超えたか
+            _, match_10m_angle_to_now = distance_and_bearing_east0(match_10m_lat, match_10m_lon, latitude, longitude)
+            deg = (match_10m_angle_to_now - match_10m_angle) % 360
+            print(deg)
+            if not (180 < deg < 360):
+                st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}'
                 self.out_result(st)
                 continue
-            
+
             # 交差点の方角取得
-            _, intersection_angle_deg = distance_and_bearing_east0( # 交差点の方角取得
+            _, intersection_former_now_angle = distance_and_bearing_east0( # 交差点の方角取得
                 self.prev_former_data[PREV_SAVE_SIZE-1][1],
                 self.prev_former_data[PREV_SAVE_SIZE-1][2],
                          near_lat, near_lon)
-            deg = (intersection_angle_deg - angle_deg) % 360
+            deg = (intersection_former_now_angle - former_now_angle) % 360
             if 180 < deg < 360:                                       # 走行方角に対し交差点は右側か左側か
                 # 二段階右折において信号機の有る交差点の場合
                 if signal_flag:
@@ -314,21 +329,21 @@ class Detect2ndTurn:
                     if turn_stop_ok_flag:
                         self.shared.stop_wav_run = True # 安全監視中音声を出さない
                         self.shared.detect_status = 44  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
-                        st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, run_angle:{save_running_direction:.1f}, head:{angle_deg:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}, center:{result}, detect_2nd_turn_ok'
+                        st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}, detect_2nd_turn_ok'
                         self.out_result(st)
                         sd.play(self.wav_data_turn_ok, self.wav_samplerate_turn_ng, blocking=False)
                     # 信号待ちを確認できなかった場合NG
                     else:
                         self.shared.stop_wav_run = True # 安全監視中音声を出さない
                         self.shared.detect_status = 4   # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
-                        st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, run_angle:{save_running_direction:.1f}, head:{angle_deg:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}, center:{result}, detect_2nd_turn_ng'
+                        st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}, detect_2nd_turn_ng'
                         self.out_result(st)
                         sd.play(self.wav_data_turn_ng, self.wav_samplerate_turn_ng, blocking=False)
                 # 二段階右折において信号機の無い交差点の場合OK
                 else:
                     self.shared.stop_wav_run = True # 安全監視中音声を出さない
                     self.shared.detect_status = 44  # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
-                    st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, run_angle:{save_running_direction:.1f}, head:{angle_deg:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}, center:{result}, detect_2nd_turn_ok'
+                    st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}, detect_2nd_turn_ok'
                     self.out_result(st)
                     sd.play(self.wav_data_turn_ok, self.wav_samplerate_turn_ng, blocking=False)
                 self.detect_pos = [latitude, longitude]
@@ -338,7 +353,7 @@ class Detect2ndTurn:
             # ここまできたら二段階右折違反条件成立
             self.shared.stop_wav_run = True # 安全監視中音声を出さない
             self.shared.detect_status = 4   # ﾃﾞｰﾀﾍﾞｰｽへのｽﾃｰﾀｽ
-            st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, run_angle:{save_running_direction:.1f}, head:{angle_deg:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}, center:{result}, detect_2nd_turn_ng'
+            st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}, detect_2nd_turn_ng'
             self.out_result(st)
             sd.play(self.wav_data_turn_ng, self.wav_samplerate_turn_ng, blocking=False)
             self.detect_pos = [latitude, longitude]
