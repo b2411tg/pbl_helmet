@@ -15,8 +15,8 @@ from pathlib import Path
 #PATH = "./detect_stop_two/gps_log_20251116_134409.csv"
 #PATH = "./detect_stop_two/gps_log_20251116_134409_1.csv"
 #PATH = "./detect_stop_two/gps_log_20251118_140059.csv"
-#PATH = "./detect_stop_two/gps_log_20251203_210009_former.csv"
-PATH = "./detect_stop_two/test.csv"
+PATH = "./detect_stop_two/gps_log_20251203_210009_former.csv"
+#PATH = "./detect_stop_two/test.csv"
 PREV_DENSITY_DATA = 7           # 密集を検出するデータの範囲
 DENSITY_DETECT_DISTANCE = 1.5   # 密集を検出する範囲(m)
 PREV_SAVE_SIZE = 10             # 検出に使用する為のデータ保存数
@@ -197,6 +197,12 @@ class Detect2ndTurn:
                     self.out_result(st)
                     continue
                 else:
+                    # 前回検出から15m以上でも交差点に変化がない場合は検出禁止を継続
+                    if prev_near_lat == near_lat and prev_near_lon == near_lon:
+                        st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}'
+                        self.out_result(st)
+                        continue
+                    # 前回検出から15m以上で交差点に変化があった場合は検出を許可
                     self.detect_on = True
                     turn_stop_ok_flag = False
                     signal_flag = False
@@ -248,7 +254,7 @@ class Detect2ndTurn:
                 self.shared.detect_intersection_30m.set()
 
             # 交差点までの距離10m未満になったら交差点までの角度を取得（右折を検出する際の基準角度）
-            if former_10m_angle == -1 and match_intersection_distance < 10:
+            if former_10m_angle == -1 and match_intersection_distance < 20:
                 former_10m_angle = former_now_angle
                 _, match_10m_angle = distance_and_bearing_east0(match_lat, match_lon, near_lat, near_lon)
                 match_10m_lat = match_lat
@@ -273,7 +279,7 @@ class Detect2ndTurn:
                 # 元データにおいて一時停止監視中でない場合
                 if not self.shared.detect_stop.is_set():                
 
-                    # TODO 交差点超えて停止していた場合、二段階右折正常監視開始
+                    # 交差点超えて停止していた場合、二段階右折正常監視開始
                     _, intersection_former_now_angle = distance_and_bearing_east0( # 交差点の方角取得
                         self.prev_former_data[PREV_SAVE_SIZE-1][1],
                         self.prev_former_data[PREV_SAVE_SIZE-1][2],
@@ -285,6 +291,7 @@ class Detect2ndTurn:
                     st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}'
                     self.out_result(st)
                     continue    # 一時停止監視中でない時は判定なし
+
                 # 一時停止監視中の場合、元データは停止状態か確認 1m/s
                 if former_move_distance > 1:                 
                     st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}'
@@ -311,7 +318,7 @@ class Detect2ndTurn:
             _, match_10m_angle_to_now = distance_and_bearing_east0(match_10m_lat, match_10m_lon, latitude, longitude)
             deg = (match_10m_angle_to_now - match_10m_angle) % 360
             print(deg)
-            if not (180 < deg < 360):
+            if 5 < deg < 180:
                 st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}'
                 self.out_result(st)
                 continue
