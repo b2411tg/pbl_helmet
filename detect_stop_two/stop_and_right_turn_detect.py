@@ -150,7 +150,7 @@ class Detect2ndTurn:
             former_move_distance, former_now_angle, heading = self._get_heading_distance(latitude, longitude)
             
             if len(self.prev_former_data) ==10:
-                _, former_now_angle = distance_and_bearing_east0(self.prev_former_data[PREV_SAVE_SIZE-10][1], self.prev_former_data[PREV_SAVE_SIZE-10][2],
+                _, former_now_angle = distance_and_bearing_east0(self.prev_former_data[PREV_SAVE_SIZE-3][1], self.prev_former_data[PREV_SAVE_SIZE-3][2],
                         self.prev_former_data[PREV_SAVE_SIZE-1][1], self.prev_former_data[PREV_SAVE_SIZE-1][2])
 
 
@@ -309,7 +309,7 @@ class Detect2ndTurn:
 
             # 走行していた場合二段階右折は右に40度以上の変化とする
             deg = (former_10m_angle - former_now_angle) % 360
-            if not (40 < deg < 180):
+            if not (40 < deg < 180) or former_10m_angle == -1:
                 st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}'
                 self.out_result(st)
                 continue

@@ -484,7 +484,7 @@
 { "type": "Feature", "properties": { "osmid": 1720452676, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.693153099999989, 35.5323135 ] } },
 { "type": "Feature", "properties": { "osmid": 1720452677, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.6905639, 35.5328752 ] } },
 { "type": "Feature", "properties": { "osmid": 1720452680, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.6918746, 35.5337349 ] } },
-{ "type": "Feature", "properties": { "osmid": 1720452682, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.690568399999989, 35.5337396 ] } },
+{ "type": "Feature", "properties": { "osmid": 1720452682, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.6905622, 35.5337496 ] } },
 { "type": "Feature", "properties": { "osmid": 1720452686, "has_signal": true }, "geometry": { "type": "Point", "coordinates": [ 139.690572300000014, 35.5348488 ] } },
 { "type": "Feature", "properties": { "osmid": 1720452689, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.6905625, 35.5358034 ] } },
 { "type": "Feature", "properties": { "osmid": 1720452691, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.6980825, 35.5363088 ] } },
@@ -788,6 +788,7 @@
 { "type": "Feature", "properties": { "osmid": 11372993362, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.695454899999987, 35.5414381 ] } },
 { "type": "Feature", "properties": { "osmid": 11372999015, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.695832599999989, 35.5411773 ] } },
 { "type": "Feature", "properties": { "osmid": 11559142995, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.696134300000011, 35.5445716 ] } },
-{ "type": "Feature", "properties": { "osmid": 12458287379, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.6774131, 35.5365854 ] } }
+{ "type": "Feature", "properties": { "osmid": 12458287379, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.6774131, 35.5365854 ] } },
+{ "type": "Feature", "properties": { "osmid": 12458287379, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.6892568, 35.5388745 ] } }
 ]
 }
