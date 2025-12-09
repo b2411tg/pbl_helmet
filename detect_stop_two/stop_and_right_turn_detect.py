@@ -114,20 +114,20 @@ class Detect2ndTurn:
         match_10m_angle = -1
 
         #TODO GPSから緯度経度取得
-        df = pd.read_csv(PATH)  # 列: UTC, latitude, longitude
-        for idx, r in df.iterrows():
-            time.sleep(0.1)            
-            utc = r["UTC"]
-            latitude = r["latitude"]
-            longitude = r["longitude"]
+#        df = pd.read_csv(PATH)  # 列: UTC, latitude, longitude
+#        for idx, r in df.iterrows():
+#            time.sleep(0.1)            
+#            utc = r["UTC"]
+#            latitude = r["latitude"]
+#            longitude = r["longitude"]
         #TODO ここまで
-#        while True:
-#            self.shared.gnss_position_ready.wait()
-#            pos = (self.shared.gnss_position).split(",")
-#            utc = np.float64(pos[0])
-#            latitude = np.float64(pos[1])
-#            longitude = np.float64(pos[2])
-#            self.shared.gnss_position_ready.clear()
+        while True:
+            self.shared.gnss_position_ready.wait()
+            pos = (self.shared.gnss_position).split(",")
+            utc = np.float64(pos[0])
+            latitude = np.float64(pos[1])
+            longitude = np.float64(pos[2])
+            self.shared.gnss_position_ready.clear()
 
             if utc==50437.0:
                 pass
@@ -269,7 +269,7 @@ class Detect2ndTurn:
             ''' 判定  ﾏｯﾁﾝｸﾞﾃﾞｰﾀ密集度＋移動距離/m＋交差点の方角＋走行方角 '''
 
             # ﾏｯﾁﾝｸﾞﾃﾞｰﾀは指定の距離の範囲内に密集しているか
-            if prev_density_distance_m > DENSITY_DETECT_DISTANCE:
+            if (prev_density_distance_m > DENSITY_DETECT_DISTANCE) and match_intersection_distance > 5:
                 st = f'{utc}, {match_lat:.6f}, {match_lon:.6f}, former_10m_angle:{former_10m_angle:.1f}, former_now_angle:{former_now_angle:.1f}, move:{former_move_distance:.6f}, inter:{match_intersection_distance:.6f}, n_lat:{near_lat:.6f}, n_lon:{near_lon:.6f}, 密度:{prev_density_distance_m:.6f}'
                 self.out_result(st)
                 continue
