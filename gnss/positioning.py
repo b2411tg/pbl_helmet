@@ -34,7 +34,7 @@ class GetPositioning:
     def get_pos(self):
         while(True):
             line = self.ser.readline().decode(errors="ignore").strip()
-            if line and line.startswith("$GPRMC"):
+            if line and (line.startswith("$GPRMC") or line.startswith("$GNRMC")):
                 self.line = line.split(',')
                 break
 
@@ -55,7 +55,7 @@ class GetPositioning:
         return dt_jst.strftime('%Y%m%d%H%M%S') + time[6:8]
     
     def save_pos(self):
-        if self.line[0] == '$GPRMC':
+        if self.line[0] == '$GPRMC' or self.line[0] == '$GNRMC':
             if not self.line[3] and not self.line[5]:
                 return
             jst_str = self.utc_to_jst_str(self.line[1], self.line[9])
