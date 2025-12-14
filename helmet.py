@@ -22,19 +22,35 @@ class Shared:
         self.sql_insert_data = None
         self.detect_status = 0
         self.stop_wav_run = False
+        self.gnss_status = 0
 
 class RunningMsg:
     def __init__(self, shared):
         self.shared = shared
         self.wav_data_running, self.wav_samplerate_running = sf.read("sound/anzen_kanshi.wav", dtype="float32")
+        self.wav_data_no_gnss, self.wav_samplerate_no_gnss = sf.read("sound/no_gnss.wav", dtype="float32")
+        self.wav_data_normal_gnss, self.wav_samplerate_normal_gnss = sf.read("sound/normal.wav", dtype="float32")
+        self.wav_data_sub_gnss, self.wav_samplerate_sub_gnss = sf.read("sound/submeter.wav", dtype="float32")
+        self.wav_data_float_gnss, self.wav_samplerate_float_gnss = sf.read("sound/float.wav", dtype="float32")
+        self.wav_data_centi_gnss, self.wav_samplerate_centi_gnss = sf.read("sound/centimeter.wav", dtype="float32")
 
     def run(self):
         sd.play(self.wav_data_running, self.wav_samplerate_running, blocking=False)
         while True:
             time.sleep(10)
             if self.shared.detect_status != 2 and not self.shared.stop_wav_run:
-                sd.play(self.wav_data_running, self.wav_samplerate_running, blocking=False)
-
+                if self.shared.gnss_status == 0:
+                    sd.play(self.wav_data_no_gnss, self.wav_samplerate_no_gnss, blocking=False)
+                elif self.shared.gnss_status == 1:
+                    sd.play(self.wav_data_normal_gnss, self.wav_samplerate_normal_gnss, blocking=False)
+                elif self.shared.gnss_status == 2:
+                    sd.play(self.wav_data_sub_gnss, self.wav_samplerate_sub_gnss, blocking=False)
+                elif self.shared.gnss_status == 5:
+                    sd.play(self.wav_data_float_gnss, self.wav_samplerate_float_gnss, blocking=False)
+                elif self.shared.gnss_status == 4:
+                    sd.play(self.wav_data_centi_gnss, self.wav_samplerate_centi_gnss, blocking=False)
+                else:
+                    sd.play(self.wav_data_running, self.wav_samplerate_running, blocking=False)
 
 def put_latest(q: queue.Queue, item):
     try:

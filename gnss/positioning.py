@@ -34,7 +34,9 @@ class GetPositioning:
     def get_pos(self):
         while(True):
             line = self.ser.readline().decode(errors="ignore").strip()
-            if line and (line.startswith("$GPRMC") or line.startswith("$GNRMC")):
+            if (line.find('GGA')) > 0:
+                self.shared.gnss_status = int(line.split(',')[6])
+            if line and (line.find('RMC')) > 0:
                 self.line = line.split(',')
                 break
 
