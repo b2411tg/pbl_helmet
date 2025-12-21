@@ -57,13 +57,13 @@ class GetPositioning:
         return dt_jst.strftime('%Y%m%d%H%M%S') + time[6:8]
     
     def save_pos(self):
-        if self.line[0] == '$GPRMC' or self.line[0] == '$GNRMC':
+        if self.line[0].find('RMC') > 0:
             if not self.line[3] and not self.line[5]:
                 return
             jst_str = self.utc_to_jst_str(self.line[1], self.line[9])
             latitude = self.gga_to_decimal(float(self.line[3]))
             longitude = self.gga_to_decimal(float(self.line[5]))
-            data = f'{jst_str},{latitude:.8f},{longitude:.8f}'
+            data = f'{jst_str},{latitude:.8f},{longitude:.8f},{self.shared.gnss_status}'
             self.shared.gnss_position = data
             self.shared.gnss_position_ready.set()
 #            print(data)

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import threading
 from detect_stop_two.stop_and_right_turn_detect import Detect2ndTurn
 from yolo.yolo_object_detect import DetectYoloObject
