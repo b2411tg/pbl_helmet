@@ -1,0 +1,66 @@
+import serial
+import time
+from datetime import datetime
+from pathlib import Path
+import sys
+from datetime import datetime, timedelta
+
+class GetPositioning:
+    def __init__(self, shared):
+        self.open_ser = False
+        self.shared = shared
+
+    def gps_init(self):
+        try:
+            self.ser = serial.Serial("/dev/ttyS4", 230400, timeout=0.5)
+            time.sleep(0.5)
+            self.open_ser = True
+        except Exception as e:
+            print(e)
+        return self.open_ser
+
+    def get_pos(self):
+        while(True):
+            line = self.ser.readline().decode(errors="ignore").strip()
+            if (line.find('GGA')) > 0:
+                self.shared.gnss_status = int(line.split(',')[6])
+            if line and (line.find('RMC')) > 0:
+                self.line = line.split(',')
+                break
+
+    def gga_to_decimal(self, coord):
+        deg = int(coord / 100)
+        minutes = coord - deg * 100
+        return round(deg + minutes / 60, 8)
+
+    def utc_to_jst_str(self, time, date):
+        dd = int(date[0:2])
+        MM = int(date[2:4])
+        year = 2000 + int(date[4:6])
+        hh = int(time[0:2])
+        mm = int(time[2:4])
+        ss = int(time[4:6])
+        dt_utc = datetime(year, MM, dd, hh, mm, ss)
+        dt_jst = dt_utc + timedelta(hours=9)
+        return dt_jst.strftime('%Y%m%d%H%M%S') + time[6:8]
+    
+    def save_pos(self):
+        if self.line[0].find('RMC') > 0:
+            if not self.line[3] and not self.line[5]:
+                return
+            jst_str = self.utc_to_jst_str(self.line[1], self.line[9])
+            latitude = self.gga_to_decimal(float(self.line[3]))
+            longitude = self.gga_to_decimal(float(self.line[5]))
+            self.shared.gnss_data[0] = jst_str
+            self.shared.gnss_data[1] = latitude
+            self.shared.gnss_data[2] = longitude
+            self.shared.gnss_position_ready.set()
+            data = f"{self.shared.gnss_data[0]},{self.shared.gnss_data[1]},{self.shared.gnss_data[2]}"
+            print(data)
+            
+    def main(self):
+        if self.gps_init() == False:
+            sys.exit()
+        while(True):
+            self.get_pos()
+            self.save_pos()
