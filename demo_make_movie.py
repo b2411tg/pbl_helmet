@@ -53,27 +53,44 @@ def put_latest(q: queue.Queue, item):
             pass
         q.put_nowait(item)
 
-def capture_loop():
-    cap = cv2.VideoCapture(11)
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    writer = cv2.VideoWriter("video.mp4", fourcc, 15, (1280, 720))
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-    try:
-        while not stop_event.is_set():
-            ret, frame = cap.read()
-    #        frame = cv2.rotate(frame, cv2.ROTATE_180)
-            if not ret:
-                break
-            # 各タスク入力キューへ複製を配信
-            if not frame_image_in.full():
-                frame_image_in.put_nowait(frame)
-            writer.write(frame)
-    finally:
-        print("END")
-        writer.release()
-        cap.release()
-        os.close()
+class MakeMovie:
+    def __init__(self, shared):
+        self.shared = shared
+
+    def capture_loop(self):
+        index = 1
+        fp = self.open_csv()
+        cap = cv2.VideoCapture(11)
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        writer = cv2.VideoWriter("video.mp4", fourcc, 15, (1280, 720))
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        try:
+            while not stop_event.is_set():
+                ret, frame = cap.read()
+        #        frame = cv2.rotate(frame, cv2.ROTATE_180)
+                if not ret:
+                    break
+                # 各タスク入力キューへ複製を配信
+                if not frame_image_in.full():
+                    frame_image_in.put_nowait(frame)
+                writer.write(frame)
+                data = f'{index},{self.shared.gnss_data[0]},{self.shared.gnss_data[1]},{self.shared.gnss_data[2]}'
+                fp.writelines(data + '\n')
+                fp.flush()
+                index += 1
+        finally:
+            print("END")
+            writer.release()
+            cap.release()
+            os.close()
+
+    def open_csv(self):
+        f = open("demo_video_lat_lon.csv", "w", newline="", encoding="utf-8")
+        column_name = 'IDX,UTC,latitude,longitude\n'
+        f.writelines(column_name)
+        f.flush()
+        return f
 
 def main():
     try:
@@ -95,8 +112,9 @@ if __name__ == '__main__':
     frame_image_in = queue.Queue(maxsize=2)
 
     # ﾒｲﾝ側でｶﾒﾗをｵｰﾌﾟﾝしてﾌﾚｰﾑを取得するﾀｽｸ 設定
-    thread_cap = threading.Thread(target=capture_loop, daemon=False)
-    thread_cap.start()
+    make_movie = MakeMovie(shared)
+    thread_make_movie = threading.Thread(target=make_movie.capture_loop, daemon=False)
+    thread_make_movie.start()
 
     # 各ﾀｽｸの設定
     get_positionig = GetPositioning(shared)
