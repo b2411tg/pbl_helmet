@@ -8,6 +8,7 @@ import time
 import sounddevice as sd
 import soundfile as sf
 import os
+from datetime import datetime
 
 class Shared:
     def __init__(self):
@@ -62,7 +63,8 @@ class MakeMovie:
         fp = self.open_csv()
         cap = cv2.VideoCapture(11)
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        writer = cv2.VideoWriter("video.mp4", fourcc, 15, (1280, 720))
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        writer = cv2.VideoWriter(f"video_{ts}.mp4", fourcc, 15, (1280, 720))
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         try:
@@ -79,6 +81,8 @@ class MakeMovie:
                 fp.writelines(data + '\n')
                 fp.flush()
                 index += 1
+                if index > 40000:
+                    break
         finally:
             print("END")
             writer.release()
@@ -86,7 +90,8 @@ class MakeMovie:
             os.close()
 
     def open_csv(self):
-        f = open("demo_video_lat_lon.csv", "w", newline="", encoding="utf-8")
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        f = open(f"demo_video_lat_lon_{ts}.csv", "w", newline="", encoding="utf-8")
         column_name = 'IDX,UTC,latitude,longitude\n'
         f.writelines(column_name)
         f.flush()

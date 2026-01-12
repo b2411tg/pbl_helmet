@@ -2,3 +2,4 @@ __pycache__/
 *.py[cod]
 yolo/*.mp4
 *.csv
+*.mp4

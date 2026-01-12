@@ -111,9 +111,9 @@ class PostgreSQL:
         return True
 
     def main(self):
-        self.create_db()
-        self.remove_table()
-        self.create_table()
+#        self.create_db()
+#        self.remove_table()
+#        self.create_table()
         con = self.connect()
         while True:
             self.shared.sql_insert_line.wait()
