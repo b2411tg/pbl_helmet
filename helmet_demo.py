@@ -84,6 +84,7 @@ class MoviePlay:
         lasttime = 0
         while True:
             ret, frame = cap.read()
+            frame = cv2.resize(frame, (1920,1080))
             if not ret:
                 break
             if not frame_demo_in.full():
@@ -123,7 +124,7 @@ if __name__ == '__main__':
 
     #
     movie_play = MoviePlay(shared)
-    cap_movie = cv2.VideoCapture("video.mp4")
+    cap_movie = cv2.VideoCapture("video_20260112_160019.mp4")
     thread_cap_demo = threading.Thread(target=movie_play.movie_play, args=(cap_movie, frame_demo_in), daemon=True)
     thread_cap_demo.start()
 

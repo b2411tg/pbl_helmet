@@ -789,6 +789,7 @@
 { "type": "Feature", "properties": { "osmid": 11372999015, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.695832599999989, 35.5411773 ] } },
 { "type": "Feature", "properties": { "osmid": 11559142995, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.696134300000011, 35.5445716 ] } },
 { "type": "Feature", "properties": { "osmid": 12458287379, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.6774131, 35.5365854 ] } },
-{ "type": "Feature", "properties": { "osmid": 12458287379, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.6892568, 35.5388745 ] } }
+{ "type": "Feature", "properties": { "osmid": 12458287379, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.6892568, 35.5388745 ] } },
+{ "type": "Feature", "properties": { "osmid": 12458287379, "has_signal": false }, "geometry": { "type": "Point", "coordinates": [ 139.6890209, 35.5360380 ] } }
 ]
 }
