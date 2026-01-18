@@ -81,8 +81,9 @@ class MoviePlay:
         self.shared = shared
 
     def movie_play(self, cap, output):
-        lasttime = 0
+        idx = 0
         while True:
+            idx += 1
             ret, frame = cap.read()
             frame = cv2.resize(frame, (1920,1080))
             if not ret:
@@ -97,12 +98,14 @@ def main():
         if not frame_yolo_in.empty():
             frame = frame_yolo_in.get_nowait()
             cv2.imshow("YOLO DETECT", frame)
+            cv2.moveWindow("YOLO DETECT", 1500, 700)
         if not frame_seg_in.empty():
             frame = frame_seg_in.get_nowait()
             cv2.imshow("SEGMENTATION DETECT", frame)
         if not frame_demo_in.empty():
             frame = frame_demo_in.get_nowait()
             cv2.imshow("DEMO_MOVIE", frame)
+            cv2.moveWindow("DEMO_MOVIE", 0, 0)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break           
     cv2.destroyAllWindows()
@@ -124,7 +127,7 @@ if __name__ == '__main__':
 
     #
     movie_play = MoviePlay(shared)
-    cap_movie = cv2.VideoCapture("video_20260112_160019.mp4")
+    cap_movie = cv2.VideoCapture("demo_join_movie.mp4")
     thread_cap_demo = threading.Thread(target=movie_play.movie_play, args=(cap_movie, frame_demo_in), daemon=True)
     thread_cap_demo.start()
 

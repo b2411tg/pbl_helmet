@@ -60,7 +60,7 @@ class MakeMovie:
 
     def capture_loop(self):
         index = 1
-        cap = cv2.VideoCapture("video_20260112_160019.mp4")
+        cap = cv2.VideoCapture("video_20260118_083635.mp4")
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         writer = cv2.VideoWriter(f"video_{ts}.mp4", fourcc, 15, (1280, 720))
@@ -68,13 +68,14 @@ class MakeMovie:
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         try:
             while not stop_event.is_set():
+                print(index)
                 ret, frame = cap.read()
                 if not ret:
                     break
-                if index >= 34500:
+                if index >= 17300:
                     writer.write(frame)
                 index += 1
-                if index > 35000:
+                if index > 17840:
                     break
         finally:
             print("END")

@@ -81,7 +81,7 @@ class MakeMovie:
                 fp.writelines(data + '\n')
                 fp.flush()
                 index += 1
-                if index > 40000:
+                if index > 30000:
                     break
         finally:
             print("END")
