@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import threading
-from detect_stop_two.stop_and_right_turn_detect import Detect2ndTurn
+from detect_stop_two.demo_stop_and_right_turn_detect import Detect2ndTurn
 from yolo.yolo_object_detect import DetectYoloObject
 from segmentation.detect_sidewalk_segmentation import DetectSidewalk
 from gnss.positioning import GetPositioning
@@ -24,6 +24,8 @@ class Shared:
         self.detect_status = 0
         self.stop_wav_run = False
         self.gnss_status = 0
+        self.idx = 0
+        self.frame_update = threading.Event()
 
 class RunningMsg:
     def __init__(self, shared):
@@ -68,7 +70,7 @@ def capture_loop(cap, outputs):
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
     while True:
         ret, frame = cap.read()
-#        frame = cv2.rotate(frame, cv2.ROTATE_180)
+        frame = cv2.rotate(frame, cv2.ROTATE_180)
         if not ret:
             break
         # 各タスク入力キューへ複製を配信
@@ -81,9 +83,10 @@ class MoviePlay:
         self.shared = shared
 
     def movie_play(self, cap, output):
-        idx = 0
+        self.shared.idx = 0
         while True:
-            idx += 1
+            self.shared.idx += 1
+            self.shared.frame_update.set()
             ret, frame = cap.read()
             frame = cv2.resize(frame, (1920,1080))
             if not ret:
@@ -125,31 +128,31 @@ if __name__ == '__main__':
     thread_cap = threading.Thread(target=capture_loop, args=(cap, [frame_yolo_out, frame_seg_out]), daemon=True)
     thread_cap.start()
 
-    #
-    movie_play = MoviePlay(shared)
-    cap_movie = cv2.VideoCapture("demo_join_movie.mp4")
-    thread_cap_demo = threading.Thread(target=movie_play.movie_play, args=(cap_movie, frame_demo_in), daemon=True)
-    thread_cap_demo.start()
-
     # 各ﾀｽｸの設定
     detect_2ndturn = Detect2ndTurn(shared)
     detect_stp_back = DetectYoloObject(shared, in_queue=frame_yolo_out, out_queue=frame_yolo_in)
     detect_sidewalk = DetectSidewalk(in_queue=frame_seg_out, out_queue=frame_seg_in)
-    get_positionig = GetPositioning(shared)
+#    get_positionig = GetPositioning(shared)
     running_msg = RunningMsg(shared)
     sql_log_save = PostgreSQL(shared)
     thread_2ndturn = threading.Thread(target=detect_2ndturn.main, daemon=True)
     thread_stp_back = threading.Thread(target=detect_stp_back.main, daemon=True)
     thread_sidewalk = threading.Thread(target=detect_sidewalk.main, daemon=True)
-    thread_positioning = threading.Thread(target=get_positionig.main, daemon=True)
+#    thread_positioning = threading.Thread(target=get_positionig.main, daemon=True)
     thread_running = threading.Thread(target=running_msg.run, daemon=True)
-    thread_sql = threading.Thread(target=sql_log_save.main, daemon=True)
+#    thread_sql = threading.Thread(target=sql_log_save.main, daemon=True)
     thread_2ndturn.start()
     thread_stp_back.start()
     #thread_sidewalk.start()
-    thread_positioning.start()
+#    thread_positioning.start()
     thread_running.start()
-    thread_sql.start()
+#    thread_sql.start()
+
+    #
+    movie_play = MoviePlay(shared)
+    cap_movie = cv2.VideoCapture("demo_join_movie.mp4")
+    thread_cap_demo = threading.Thread(target=movie_play.movie_play, args=(cap_movie, frame_demo_in), daemon=True)
+    thread_cap_demo.start()
 
     main()
 
