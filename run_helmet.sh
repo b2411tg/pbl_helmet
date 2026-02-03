@@ -10,5 +10,5 @@ source ~/Project/.venv/bin/activate
 cd ~/Project/pbl_helmet
 
 # メインスクリプト実行
-exec python3 helmet.py
+exec python3 helmet_demo.py
 

@@ -41,19 +41,19 @@ class RunningMsg:
         sd.play(self.wav_data_running, self.wav_samplerate_running, blocking=False)
         while True:
             time.sleep(10)
-            if self.shared.detect_status != 2 and not self.shared.stop_wav_run:
-                if self.shared.gnss_status == 0:
-                    sd.play(self.wav_data_no_gnss, self.wav_samplerate_no_gnss, blocking=False)
-                elif self.shared.gnss_status == 1:
-                    sd.play(self.wav_data_normal_gnss, self.wav_samplerate_normal_gnss, blocking=False)
-                elif self.shared.gnss_status == 2:
-                    sd.play(self.wav_data_sub_gnss, self.wav_samplerate_sub_gnss, blocking=False)
-                elif self.shared.gnss_status == 5:
-                    sd.play(self.wav_data_float_gnss, self.wav_samplerate_float_gnss, blocking=False)
-                elif self.shared.gnss_status == 4:
-                    sd.play(self.wav_data_centi_gnss, self.wav_samplerate_centi_gnss, blocking=False)
-                else:
-                    sd.play(self.wav_data_running, self.wav_samplerate_running, blocking=False)
+#            if self.shared.detect_status != 2 and not self.shared.stop_wav_run:
+#                if self.shared.gnss_status == 0:
+#                    sd.play(self.wav_data_no_gnss, self.wav_samplerate_no_gnss, blocking=False)
+#                elif self.shared.gnss_status == 1:
+#                    sd.play(self.wav_data_normal_gnss, self.wav_samplerate_normal_gnss, blocking=False)
+#                elif self.shared.gnss_status == 2:
+#                    sd.play(self.wav_data_sub_gnss, self.wav_samplerate_sub_gnss, blocking=False)
+#                elif self.shared.gnss_status == 5:
+#                    sd.play(self.wav_data_float_gnss, self.wav_samplerate_float_gnss, blocking=False)
+#                elif self.shared.gnss_status == 4:
+#                    sd.play(self.wav_data_centi_gnss, self.wav_samplerate_centi_gnss, blocking=False)
+#                else:
+#                    sd.play(self.wav_data_running, self.wav_samplerate_running, blocking=False)
 
 def put_latest(q: queue.Queue, item):
     try:
@@ -88,12 +88,16 @@ class MoviePlay:
             self.shared.idx += 1
             self.shared.frame_update.set()
             ret, frame = cap.read()
-            frame = cv2.resize(frame, (1920,1080))
             if not ret:
-                break
+                cap.release()
+                cap = cv2.VideoCapture("demo_join_movie_mod.mp4")
+                self.shared.idx = 0
+                time.sleep(2)
+                continue
+            frame = cv2.resize(frame, (1920,950))
             if not frame_demo_in.full():
                 put_latest(frame_demo_in, frame.copy())
-            time.sleep(0.02)
+            time.sleep(0.01)
         cap.release()
 
 def main():
@@ -150,7 +154,7 @@ if __name__ == '__main__':
 
     #
     movie_play = MoviePlay(shared)
-    cap_movie = cv2.VideoCapture("demo_join_movie.mp4")
+    cap_movie = cv2.VideoCapture("demo_join_movie_mod.mp4")
     thread_cap_demo = threading.Thread(target=movie_play.movie_play, args=(cap_movie, frame_demo_in), daemon=True)
     thread_cap_demo.start()
 

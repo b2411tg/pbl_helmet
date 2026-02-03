@@ -11,12 +11,6 @@ import numpy as np
 from datetime import datetime
 from pathlib import Path
 
-#PATH = "./detect_stop_two/gps_log_neo_f10n_20251021_213516.csv"
-#PATH = "./detect_stop_two/gps_log_20251116_134409.csv"
-#PATH = "./detect_stop_two/gps_log_20251116_134409_1.csv"
-#PATH = "./detect_stop_two/gps_log_20251118_140059.csv"
-PATH = "./detect_stop_two/gps_log_20251203_210009_former.csv"
-#PATH = "./detect_stop_two/test.csv"
 PREV_DENSITY_DATA = 7           # 密集を検出するデータの範囲
 DENSITY_DETECT_DISTANCE = 1.5   # 密集を検出する範囲(m)
 PREV_SAVE_SIZE = 10             # 検出に使用する為のデータ保存数
@@ -113,14 +107,14 @@ class Detect2ndTurn:
         former_10m_angle = -1
         match_10m_angle = -1
 
-        #TODO GPSから緯度経度取得
+        # CSVファイルから緯度経度を取得する際はコメント部のコードを使用
 #        df = pd.read_csv(PATH)  # 列: UTC, latitude, longitude
 #        for idx, r in df.iterrows():
 #            time.sleep(0.1)            
 #            utc = r["UTC"]
 #            latitude = r["latitude"]
 #            longitude = r["longitude"]
-        #TODO ここまで
+        # ここまで
         while True:
             self.shared.gnss_position_ready.wait()
             pos = (self.shared.gnss_position).split(",")
@@ -128,21 +122,6 @@ class Detect2ndTurn:
             latitude = np.float64(pos[1])
             longitude = np.float64(pos[2])
             self.shared.gnss_position_ready.clear()
-
-            if utc==50437.0:
-                pass
-            if utc==16044475.6:
-                pass
-            if utc==16044583.0:
-                pass
-            if utc==16044660.0:
-                pass
-            if utc==50712.0:
-                pass
-            if utc==20251203210642.0:
-                pass
-            if utc==20251203211429.0:
-                pass
 
             ''' これよりマッチング緯度経度取得、移動距離取得、走行方向取得、交差点緯度経度距離処理 '''
 
@@ -253,7 +232,7 @@ class Detect2ndTurn:
             if not self.shared.detect_intersection_30m.is_set():
                 self.shared.detect_intersection_30m.set()
 
-            # 交差点までの距離10m未満になったら交差点までの角度を取得（右折を検出する際の基準角度）
+            # 交差点までの距離20m未満になったら交差点までの角度を取得（右折を検出する際の基準角度）
             if former_10m_angle == -1 and match_intersection_distance < 20:
                 former_10m_angle = former_now_angle
                 _, match_10m_angle = distance_and_bearing_east0(match_lat, match_lon, near_lat, near_lon)
