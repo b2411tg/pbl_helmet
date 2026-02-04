@@ -4,6 +4,7 @@ from psycopg2 import sql
 from psycopg2.extras import execute_values
 import time
 import datetime as dt
+from datetime import datetime
 
 TABLE_NAME = "helmet_log"
 #HOST_IP = "192.168.1.31"    # 接続するIPアドレス
@@ -119,6 +120,9 @@ class PostgreSQL:
             self.shared.sql_insert_line.wait()
             data = (self.shared.sql_insert_data).split(",")
             self.shared.sql_insert_line.clear()
+            data[0] = data[0].split(".")[0]
+            data[0] = datetime.strptime(data[0], "%Y%m%d%H%M%S")
+            data[0] = data[0].strftime("%Y-%m-%d %H:%M:%S")
             st = f"{data[0]},{data[1]},{data[2]},{self.shared.detect_status}"
             self.insert_row(con, st)
             if self.shared.detect_status == 0 or self.shared.detect_status == 2:
